@@ -37,6 +37,7 @@
       background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 70%, transparent 100%);
       display: flex;
       gap: 8px;
+      align-items: flex-start;
     }
     .search-box {
       flex: 1;
@@ -50,7 +51,7 @@
       padding: 12px 14px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.2);
-      background: rgba(30,41,59,0.9);
+      background: rgba(30,41,59,0.95);
       color: #fff;
       font-size: 14px;
       outline: none;
@@ -64,28 +65,33 @@
       left: 0;
       right: 0;
       background: #1e293b;
-      border: 1px solid rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.3);
       border-radius: 12px;
       margin-top: 4px;
-      max-height: 200px;
+      max-height: 220px;
       overflow-y: auto;
-      z-index: 2000;
+      z-index: 9999 !important;
       display: none;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.7);
     }
     .suggestion-item {
-      padding: 10px 14px;
+      padding: 12px 14px;
       font-size: 13px;
       color: #f1f5f9;
       cursor: pointer;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
     .suggestion-item:last-child { border-bottom: none; }
     .suggestion-item:hover, .suggestion-item:active { background: #334155; color: #3b82f6; }
     
-    /* Botones */
+    /* Contenedor de Botones Superiores */
+    .action-btns {
+      display: flex;
+      gap: 6px;
+    }
+
     .btn {
-      padding: 10px 16px;
+      padding: 12px 14px;
       border-radius: 12px;
       border: none;
       font-size: 14px;
@@ -93,10 +99,14 @@
       cursor: pointer;
       transition: all 0.2s;
       white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:active { background: #2563eb; transform: scale(0.97); }
     .btn-danger { background: #ef4444; color: #fff; }
+    .btn-danger:active { background: #dc2626; transform: scale(0.97); }
     .btn-warning { background: #f59e0b; color: #000; }
     .btn-success { background: #22c55e; color: #fff; }
 
@@ -249,7 +259,10 @@
       <input type="text" id="destInput" placeholder="🏁 Escribí o tocá el mapa..." oninput="handleSearchInput(this.value)">
       <div id="suggestions" class="suggestions-list"></div>
     </div>
-    <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
+    <div class="action-btns">
+      <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
+      <button class="btn btn-danger" onclick="clearDestination()" title="Borrar Destino">❌</button>
+    </div>
   </div>
 
   <!-- Botón Flotante Waze (Reportes) -->
@@ -313,6 +326,7 @@
 
       // Evento de toque/clic en el mapa para elegir destino
       map.on('click', function(e) {
+        document.getElementById('suggestions').style.display = 'none';
         setDestinationFromMap(e.latlng);
       });
     }
@@ -344,6 +358,23 @@
       );
     }
 
+    /* Eliminar el destino marcado y limpiar la ruta */
+    function clearDestination() {
+      destPos = null;
+      currentRoute = null;
+      document.getElementById('destInput').value = '';
+      document.getElementById('suggestions').style.display = 'none';
+
+      if (destMarker) map.removeLayer(destMarker);
+      if (tempMarker) map.removeLayer(tempMarker);
+      if (routeLayer) map.removeLayer(routeLayer);
+      if (detourLayer) map.removeLayer(detourLayer);
+
+      document.getElementById('navPanel').style.display = 'none';
+      stopNavigation();
+      showToast('Destino eliminado');
+    }
+
     /* Permite seleccionar destino tocando directamente el mapa */
     async function setDestinationFromMap(latlng) {
       if (tempMarker) map.removeLayer(tempMarker);
@@ -357,10 +388,9 @@
         })
       }).addTo(map);
 
-      // Popup para confirmar navegación
       const popupDiv = document.createElement('div');
       popupDiv.style.textAlign = 'center';
-      popupDiv.innerHTML = '<div style="font-weight:bold;">📍 Destino seleccionado</div>';
+      popupDiv.innerHTML = '<div style="font-weight:bold; margin-bottom:4px;">📍 Destino seleccionado</div>';
       
       const goBtn = document.createElement('button');
       goBtn.className = 'popup-btn';
@@ -369,11 +399,18 @@
         map.closePopup();
         calculateRoute();
       };
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'popup-delete-btn';
+      delBtn.innerHTML = '❌ Borrar';
+      delBtn.onclick = () => {
+        clearDestination();
+      };
       
       popupDiv.appendChild(goBtn);
+      popupDiv.appendChild(delBtn);
       tempMarker.bindPopup(popupDiv).openPopup();
 
-      // Reverse Geocoding simple para actualizar el texto en la barra superior
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
         const data = await res.json();
@@ -388,13 +425,14 @@
       }
     }
 
-    /* Autocompletado escrito */
+    /* Autocompletado estilo Google Maps */
     function handleSearchInput(query) {
       clearTimeout(debounceTimer);
       const suggBox = document.getElementById('suggestions');
       
-      if (query.trim().length < 3) {
+      if (!query || query.trim().length < 2) {
         suggBox.style.display = 'none';
+        suggBox.innerHTML = '';
         return;
       }
 
@@ -404,6 +442,7 @@
           const res = await fetch(url);
           const data = await res.json();
           suggBox.innerHTML = '';
+          
           if (data && data.length > 0) {
             data.forEach(place => {
               const item = document.createElement('div');
@@ -424,7 +463,7 @@
         } catch (e) {
           suggBox.style.display = 'none';
         }
-      }, 300);
+      }, 250);
     }
 
     function toggleReportMenu() {
