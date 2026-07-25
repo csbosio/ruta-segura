@@ -72,13 +72,12 @@
     .btn-danger { background: #ef4444; color: #fff; }
     .btn-warning { background: #f59e0b; color: #000; }
     .btn-success { background: #22c55e; color: #fff; }
-    .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; }
 
     /* Menú Flotante Estilo Waze */
     .report-wrapper {
       position: absolute;
       right: 16px;
-      top: 40%;
+      top: 35%;
       display: flex;
       flex-direction: column;
       align-items: flex-end;
@@ -126,6 +125,44 @@
     .fab-item:active { transform: scale(0.95); background: rgba(30,41,59,1); }
     .fab-item span { font-size: 18px; }
 
+    /* Estilo de Icono Arrastrable */
+    .draggable-marker {
+      position: relative;
+      font-size: 24px;
+      background: rgba(15,23,42,0.9);
+      padding: 6px;
+      border-radius: 50%;
+      border: 2px solid #f59e0b;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      text-align: center;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .draggable-marker:active { cursor: grabbing; transform: scale(1.1); }
+
+    /* Popups de Leaflet */
+    .leaflet-popup-content-wrapper {
+      background: #0f172a !important;
+      color: #fff !important;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px !important;
+    }
+    .leaflet-popup-tip { background: #0f172a !important; }
+    .popup-delete-btn {
+      background: #ef4444;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 4px;
+      width: 100%;
+    }
+
     /* Panel Navegación Bottom */
     .nav-panel {
       bottom: 0; left: 0; right: 0;
@@ -144,19 +181,6 @@
     .nav-instruction .street { font-size: 18px; font-weight: 700; color: #fff; }
     .nav-instruction .detail { font-size: 14px; color: #94a3b8; }
     .nav-instruction .distance { font-size: 26px; font-weight: 800; color: #3b82f6; }
-
-    /* Indicador Voz */
-    .voice-indicator {
-      position: absolute;
-      top: 130px; right: 16px;
-      width: 40px; height: 40px;
-      background: rgba(30,41,59,0.9);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-      border: 1px solid rgba(255,255,255,0.1);
-      z-index: 1000;
-    }
 
     /* Toast */
     .toast {
@@ -181,8 +205,8 @@
   <!-- Barra Superior -->
   <div class="top-bar overlay">
     <div class="search-box">
-      <input type="text" id="originInput" placeholder="📍 Buscando tu ubicación..." readonly>
-      <input type="text" id="destInput" placeholder="🏁 ¿A dónde querés ir? (Ej: Av. Colón 1000)">
+      <input type="text" id="originInput" placeholder="📍 Ubicación actual" readonly>
+      <input type="text" id="destInput" placeholder="🏁 Escribí tu destino...">
     </div>
     <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
   </div>
@@ -206,8 +230,6 @@
     <button class="fab-main" onclick="toggleReportMenu()">⚠️</button>
   </div>
 
-  <div class="voice-indicator overlay" id="voiceIndicator">🔊</div>
-
   <!-- Panel Inferior -->
   <div class="nav-panel overlay" id="navPanel" style="display:none;">
     <div class="nav-instruction">
@@ -217,7 +239,7 @@
     </div>
     <div style="display:flex; gap:8px;">
       <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
-      <button class="btn btn-primary" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío</button>
+      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío</button>
       <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Finalizar</button>
     </div>
   </div>
@@ -230,8 +252,7 @@
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
     let map, userPos = null, destPos = null, currentRoute = null, detourRoute = null;
-    let isNavigating = false, watchId = null, navInterval = null;
-    let routeSteps = [], currentStepIndex = 0, announcedSteps = new Set();
+    let isNavigating = false, watchId = null;
     let voiceEnabled = true, routeLayer = null, detourLayer = null, userMarker = null, destMarker = null;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -281,24 +302,57 @@
       menu.classList.toggle('show');
     }
 
+    /* Genera una alerta interactiva, arrastrable y eliminable */
     function reportIncident(type, label) {
       toggleReportMenu();
-      if (!userPos) { showToast('Esperando GPS...'); return; }
+      const centerPos = map.getCenter(); // Aparece justo en el centro visible del mapa
 
-      // Marcar en el mapa
-      const incidentPos = [userPos[0] + 0.001, userPos[1] + 0.001]; // Simula incidente cerca adelante
-      L.marker(incidentPos, {
+      const emoji = label.split(' ')[0];
+      
+      // Crear marcador draggable (arrastrable)
+      const incidentMarker = L.marker(centerPos, {
+        draggable: true,
         icon: L.divIcon({
-          html: `<div style="font-size:22px; background:rgba(15,23,42,0.8); padding:4px; border-radius:50%; border:1px solid #fff;">${label.split(' ')[0]}</div>`,
-          iconSize: [30, 30], iconAnchor: [15, 15]
+          className: 'custom-incident-icon',
+          html: `<div class="draggable-marker">${emoji}</div>`,
+          iconSize: [36, 36],
+          iconAnchor: [18, 18]
         })
       }).addTo(map);
 
-      showToast(`Reportado: ${label}`);
-      speak(`Alerta reportada: ${label}`);
+      // Popup para borrar con la Cruz / Botón
+      const popupContent = document.createElement('div');
+      popupContent.style.textAlign = 'center';
+      popupContent.innerHTML = `
+        <div style="font-weight:bold; margin-bottom: 6px;">${label}</div>
+        <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;">Podés arrastrar este ícono en el mapa.</div>
+      `;
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'popup-delete-btn';
+      deleteBtn.innerHTML = '❌ Eliminar alerta';
+      deleteBtn.onclick = () => {
+        map.removeLayer(incidentMarker);
+        showToast('Alerta eliminada');
+      };
+      
+      popupContent.appendChild(deleteBtn);
+      incidentMarker.bindPopup(popupContent);
+
+      // Listener para recalcular desvío si se mueve un control
+      incidentMarker.on('dragend', function(event) {
+        const newPos = event.target.getLatLng();
+        showToast(`Ubicación de ${label} actualizada`);
+        if (type === 'control' && currentRoute) {
+          calculateSmartDetour([newPos.lat, newPos.lng]);
+        }
+      });
+
+      showToast(`¡${label} agregado! Arrastralo para reubicarlo.`);
+      speak(`${label} reportado. Podés moverlo en el mapa.`);
 
       if (type === 'control' && currentRoute) {
-        calculateSmartDetour(incidentPos);
+        calculateSmartDetour([centerPos.lat, centerPos.lng]);
       }
     }
 
@@ -323,32 +377,11 @@
           return {
             coords: route.geometry.coordinates.map(c => [c[1], c[0]]),
             distance: route.distance,
-            duration: route.duration,
-            steps: extractSteps(route)
+            duration: route.duration
           };
         }
       } catch (e) {}
       return null;
-    }
-
-    function extractSteps(route) {
-      const steps = [];
-      if (route.legs) {
-        route.legs.forEach(leg => {
-          if (leg.steps) {
-            leg.steps.forEach(step => {
-              steps.push({
-                instruction: step.maneuver.type,
-                modifier: step.maneuver.modifier,
-                name: step.name || 'calle sin nombre',
-                distance: step.distance,
-                location: [step.maneuver.location[1], step.maneuver.location[0]]
-              });
-            });
-          }
-        });
-      }
-      return steps;
     }
 
     async function calculateRoute() {
@@ -373,8 +406,6 @@
       if (!currentRoute) { showToast('Error al trazar ruta'); return; }
 
       drawRoute(currentRoute.coords, '#3b82f6', false);
-      routeSteps = currentRoute.steps;
-      currentStepIndex = 0;
 
       document.getElementById('navPanel').style.display = 'flex';
       document.getElementById('btnStart').style.display = 'block';
@@ -402,7 +433,7 @@
 
     async function calculateSmartDetour(controlPos) {
       if (!userPos || !destPos) return;
-      const perpPoint = [controlPos[0] + 0.003, controlPos[1] - 0.003]; // Desvío perpendicular
+      const perpPoint = [controlPos[0] + 0.003, controlPos[1] - 0.003];
       detourRoute = await getRoute([userPos, perpPoint, destPos]);
 
       if (detourRoute) {
@@ -418,7 +449,6 @@
       drawRoute(detourRoute.coords, '#3b82f6', false);
       if (detourLayer) map.removeLayer(detourLayer);
       currentRoute = detourRoute;
-      routeSteps = detourRoute.steps;
       document.getElementById('btnDetour').style.display = 'none';
       showToast('Desvío activado');
       speak('Ruta actualizada por desvío.');
