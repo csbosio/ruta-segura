@@ -43,6 +43,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      position: relative;
     }
     .search-box input {
       width: 100%;
@@ -55,6 +56,32 @@
       outline: none;
     }
     .search-box input::placeholder { color: #94a3b8; }
+
+    /* Menú Desplegable de Sugerencias (Estilo Google Maps) */
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #1e293b;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 12px;
+      margin-top: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 2000;
+      display: none;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .suggestion-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #f1f5f9;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover, .suggestion-item:active { background: #334155; color: #3b82f6; }
     
     /* Botones */
     .btn {
@@ -148,8 +175,21 @@
       color: #fff !important;
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 12px !important;
+      padding: 6px !important;
     }
     .leaflet-popup-tip { background: #0f172a !important; }
+    .popup-btn {
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 13px;
+      cursor: pointer;
+      margin-top: 6px;
+      width: 100%;
+    }
     .popup-delete-btn {
       background: #ef4444;
       color: #fff;
@@ -206,7 +246,8 @@
   <div class="top-bar overlay">
     <div class="search-box">
       <input type="text" id="originInput" placeholder="📍 Ubicación actual" readonly>
-      <input type="text" id="destInput" placeholder="🏁 Escribí tu destino...">
+      <input type="text" id="destInput" placeholder="🏁 Escribí o tocá el mapa..." oninput="handleSearchInput(this.value)">
+      <div id="suggestions" class="suggestions-list"></div>
     </div>
     <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
   </div>
@@ -253,7 +294,8 @@
 
     let map, userPos = null, destPos = null, currentRoute = null, detourRoute = null;
     let isNavigating = false, watchId = null;
-    let voiceEnabled = true, routeLayer = null, detourLayer = null, userMarker = null, destMarker = null;
+    let voiceEnabled = true, routeLayer = null, detourLayer = null, userMarker = null, destMarker = null, tempMarker = null;
+    let debounceTimer = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -268,6 +310,11 @@
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+      // Evento de toque/clic en el mapa para elegir destino
+      map.on('click', function(e) {
+        setDestinationFromMap(e.latlng);
+      });
     }
 
     function getUserLocation() {
@@ -297,19 +344,99 @@
       );
     }
 
+    /* Permite seleccionar destino tocando directamente el mapa */
+    async function setDestinationFromMap(latlng) {
+      if (tempMarker) map.removeLayer(tempMarker);
+
+      destPos = [latlng.lat, latlng.lng];
+
+      tempMarker = L.marker(destPos, {
+        icon: L.divIcon({
+          html: '<div style="font-size:26px;">🏁</div>',
+          iconSize: [30, 30], iconAnchor: [15, 30]
+        })
+      }).addTo(map);
+
+      // Popup para confirmar navegación
+      const popupDiv = document.createElement('div');
+      popupDiv.style.textAlign = 'center';
+      popupDiv.innerHTML = '<div style="font-weight:bold;">📍 Destino seleccionado</div>';
+      
+      const goBtn = document.createElement('button');
+      goBtn.className = 'popup-btn';
+      goBtn.innerHTML = '🚀 Trazar Ruta';
+      goBtn.onclick = () => {
+        map.closePopup();
+        calculateRoute();
+      };
+      
+      popupDiv.appendChild(goBtn);
+      tempMarker.bindPopup(popupDiv).openPopup();
+
+      // Reverse Geocoding simple para actualizar el texto en la barra superior
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          const shortName = data.display_name.split(',')[0];
+          document.getElementById('destInput').value = shortName;
+        } else {
+          document.getElementById('destInput').value = 'Punto en el mapa';
+        }
+      } catch(e) {
+        document.getElementById('destInput').value = 'Punto en el mapa';
+      }
+    }
+
+    /* Autocompletado escrito */
+    function handleSearchInput(query) {
+      clearTimeout(debounceTimer);
+      const suggBox = document.getElementById('suggestions');
+      
+      if (query.trim().length < 3) {
+        suggBox.style.display = 'none';
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query + ', Córdoba, Argentina')}&format=json&limit=5`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          suggBox.innerHTML = '';
+          if (data && data.length > 0) {
+            data.forEach(place => {
+              const item = document.createElement('div');
+              item.className = 'suggestion-item';
+              item.textContent = place.display_name;
+              item.onclick = () => {
+                document.getElementById('destInput').value = place.display_name.split(',')[0];
+                destPos = [parseFloat(place.lat), parseFloat(place.lon)];
+                suggBox.style.display = 'none';
+                calculateRoute();
+              };
+              suggBox.appendChild(item);
+            });
+            suggBox.style.display = 'block';
+          } else {
+            suggBox.style.display = 'none';
+          }
+        } catch (e) {
+          suggBox.style.display = 'none';
+        }
+      }, 300);
+    }
+
     function toggleReportMenu() {
       const menu = document.getElementById('reportMenu');
       menu.classList.toggle('show');
     }
 
-    /* Genera una alerta interactiva, arrastrable y eliminable */
     function reportIncident(type, label) {
       toggleReportMenu();
-      const centerPos = map.getCenter(); // Aparece justo en el centro visible del mapa
-
+      const centerPos = map.getCenter();
       const emoji = label.split(' ')[0];
       
-      // Crear marcador draggable (arrastrable)
       const incidentMarker = L.marker(centerPos, {
         draggable: true,
         icon: L.divIcon({
@@ -320,7 +447,6 @@
         })
       }).addTo(map);
 
-      // Popup para borrar con la Cruz / Botón
       const popupContent = document.createElement('div');
       popupContent.style.textAlign = 'center';
       popupContent.innerHTML = `
@@ -339,7 +465,6 @@
       popupContent.appendChild(deleteBtn);
       incidentMarker.bindPopup(popupContent);
 
-      // Listener para recalcular desvío si se mueve un control
       incidentMarker.on('dragend', function(event) {
         const newPos = event.target.getLatLng();
         showToast(`Ubicación de ${label} actualizada`);
@@ -354,16 +479,6 @@
       if (type === 'control' && currentRoute) {
         calculateSmartDetour([centerPos.lat, centerPos.lng]);
       }
-    }
-
-    async function geocode(address) {
-      const url = `${NOMINATIM_URL}?q=${encodeURIComponent(address + ', Córdoba, Argentina')}&format=json&limit=1`;
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data && data.length > 0) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-      } catch (e) {}
-      return null;
     }
 
     async function getRoute(points) {
@@ -385,19 +500,30 @@
     }
 
     async function calculateRoute() {
+      document.getElementById('suggestions').style.display = 'none';
       const destAddress = document.getElementById('destInput').value.trim();
-      if (!destAddress) { showToast('Escribí un destino arriba'); return; }
+      
+      if (!destAddress && !destPos) { showToast('Escribí o tocá un destino en el mapa'); return; }
       if (!userPos) { showToast('Obteniendo tu ubicación GPS...'); return; }
 
-      showToast('Calculando la mejor ruta...');
-      destPos = await geocode(destAddress);
+      if (!destPos) {
+        showToast('Buscando dirección...');
+        const url = `${NOMINATIM_URL}?q=${encodeURIComponent(destAddress + ', Córdoba, Argentina')}&format=json&limit=1`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data && data.length > 0) destPos = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+        } catch (e) {}
+      }
       
       if (!destPos) { showToast('No se encontró la dirección'); return; }
 
       if (destMarker) map.removeLayer(destMarker);
+      if (tempMarker) map.removeLayer(tempMarker);
+
       destMarker = L.marker(destPos, {
         icon: L.divIcon({
-          html: '<div style="font-size:24px;">🏁</div>',
+          html: '<div style="font-size:26px;">🏁</div>',
           iconSize: [30, 30], iconAnchor: [15, 30]
         })
       }).addTo(map);
