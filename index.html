@@ -2,89 +2,654 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Ruta Segura</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+  <!-- CABECERAS ANTI-CACHÉ ESTRUCTURALES -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  
+  <title>Ruta Segura - Ultra Rápida</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    #map { 
+      position: absolute; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      z-index: 1; 
+      background: #e2e8f0; /* Fondo base claro mientras cargan los mosaicos */
+    }
+    .overlay { position: absolute; z-index: 1000; pointer-events: none; }
+    .overlay > * { pointer-events: auto; }
 
-  <!-- Anti-Caché -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
+    /* Barra Superior */
+    .top-bar {
+      top: 0; left: 0; right: 0;
+      padding: 12px 16px;
+      background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 70%, transparent 100%);
+      display: flex; gap: 8px; align-items: flex-start;
+    }
+    .search-box { flex: 1; display: flex; flex-direction: column; gap: 8px; position: relative; }
+    
+    .input-row {
+      display: flex; align-items: center; background: rgba(30,41,59,0.95);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 2px 8px;
+    }
+    .input-row:focus-within { border-color: #3b82f6; }
+    
+    .input-row input {
+      flex: 1; padding: 10px 6px; border: none; background: transparent;
+      color: #fff; font-size: 14px; outline: none; width: 100%;
+    }
+    
+    .icon-btn {
+      background: none; border: none; color: #94a3b8; font-size: 15px;
+      cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:active { color: #fff; transform: scale(1.1); }
 
-  <!-- Leaflet CSS desde Cloudflare (Super estable) -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    .suggestions-list {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #1e293b; border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 12px; margin-top: 4px; max-height: 220px; overflow-y: auto;
+      z-index: 9999 !important; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+    }
+    .suggestion-item {
+      padding: 12px 14px; font-size: 13px; color: #f1f5f9; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .suggestion-item:hover { background: #334155; color: #3b82f6; }
+    
+    .action-btns { display: flex; align-self: center; }
+    .btn {
+      padding: 12px 16px; border-radius: 12px; border: none; font-size: 14px;
+      font-weight: 700; cursor: pointer; white-space: nowrap; display: flex;
+      align-items: center; justify-content: center; height: 100%;
+    }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-warning { background: #f59e0b; color: #000; }
+    .btn-success { background: #22c55e; color: #fff; }
 
-  <!-- CSS local con versión para romper caché -->
-  <script>
-    const styleLink = document.createElement('link');
-    styleLink.rel = 'stylesheet';
-    styleLink.href = 'styles.css?v=' + Date.now();
-    document.head.appendChild(styleLink);
-  </script>
+    /* CONTENEDOR DE BURBUJAS DERECHA */
+    .floating-controls {
+      position: absolute; right: 16px; top: 22%;
+      display: flex; flex-direction: column; gap: 14px;
+      align-items: flex-end; z-index: 1500;
+    }
+
+    .bubble-group { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+
+    .fab-btn {
+      width: 52px; height: 52px; border-radius: 50%; font-size: 22px;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+    .fab-gps { background: #10b981; color: #fff; }
+    .fab-horn { background: #2563eb; color: #fff; }
+    .fab-alert { background: #f59e0b; color: #000; }
+
+    .menu-options {
+      display: none; flex-direction: column; gap: 8px; align-items: flex-end;
+    }
+    .menu-options.active { display: flex; }
+
+    .menu-item {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(15,23,42,0.95); padding: 8px 14px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 13px;
+      font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .menu-item:active { background: #334155; }
+
+    .draggable-marker {
+      font-size: 24px; background: rgba(15,23,42,0.9); padding: 6px;
+      border-radius: 50%; border: 2px solid #f59e0b; text-align: center; cursor: grab;
+    }
+
+    /* Popups */
+    .leaflet-popup-content-wrapper { background: #0f172a !important; color: #fff !important; border-radius: 12px !important; }
+    .popup-delete-btn { background: #ef4444; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; width: 100%; margin-top: 4px; cursor: pointer; }
+
+    /* Panel Inferior */
+    .nav-panel {
+      bottom: 0; left: 0; right: 0; padding: 0 16px 20px;
+      background: linear-gradient(0deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,0.85) 60%, transparent 100%);
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .nav-instruction { background: rgba(30,41,59,0.95); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.1); }
+    .nav-instruction .street { font-size: 18px; font-weight: 700; color: #fff; }
+    .nav-instruction .distance { font-size: 26px; font-weight: 800; color: #3b82f6; }
+
+    .toast {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(15,23,42,0.95); color: #fff; padding: 12px 20px;
+      border-radius: 12px; font-size: 14px; z-index: 3000; display: none;
+      border: 1px solid rgba(255,255,255,0.2); text-align: center;
+    }
+    .toast.show { display: block; }
+  </style>
 </head>
 <body>
+  <div id="map"></div>
 
-  <!-- Overlay Buscador -->
-  <div class="overlay top-bar">
+  <!-- Barra Superior -->
+  <div class="top-bar overlay">
     <div class="search-box">
+      <!-- Fila 1: Origen -->
       <div class="input-row">
-        <button class="icon-btn" onclick="enableSetOriginMode()">📍</button>
-        <input type="text" id="originInput" placeholder="Origen (ej. Córdoba Centro)" oninput="handleSearchInput(this.value, 'origin')">
-        <button class="icon-btn" onclick="clearOrigin()">❌</button>
+        <button class="icon-btn" onclick="getUserLocation()" title="Usar GPS actual">📍</button>
+        <input type="text" id="originInput" placeholder="Origen: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
+        <button class="icon-btn" onclick="clearOrigin()" title="Borrar Origen">❌</button>
       </div>
-
+      
+      <!-- Fila 2: Destino -->
       <div class="input-row">
-        <button class="icon-btn">🏁</button>
-        <input type="text" id="destInput" placeholder="¿A dónde vas?" oninput="handleSearchInput(this.value, 'dest')">
-        <button class="icon-btn" onclick="clearDestination()">❌</button>
+        <span style="font-size:14px; padding:0 6px;">🏁</span>
+        <input type="text" id="destInput" placeholder="Destino: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
+        <button class="icon-btn" onclick="clearDestination()" title="Borrar Destino">❌</button>
       </div>
 
       <div id="suggestions" class="suggestions-list"></div>
     </div>
 
     <div class="action-btns">
-      <button class="btn btn-primary" onclick="calculateRoute()">Ir</button>
+      <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
     </div>
   </div>
 
-  <!-- Botones Flotantes -->
-  <div class="floating-controls">
+  <!-- BURBUJAS FLOTANTES DERECHA -->
+  <div class="floating-controls overlay">
+    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Marcar punto de origen en el mapa">🚗</button>
+
+    <!-- Burbuja 1: Bocina (Controles e Inspecciones) -->
     <div class="bubble-group">
-      <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
-      <div id="alertOptions" class="menu-options">
-        <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')">🕳️ Bache</div>
-        <div class="menu-item" onclick="reportIncident('corte', '🚧 Calle cortada')">🚧 Calle cortada</div>
-        <div class="menu-item" onclick="reportIncident('policia', '👮 Control policial')">👮 Control</div>
+      <div class="menu-options" id="hornOptions">
+        <div class="menu-item" onclick="reportIncident('control_municipal', '🏛️ Control Municipal')"><span>🏛️</span> Control Municipal</div>
+        <div class="menu-item" onclick="reportIncident('itv', '🔍 ITV')"><span>🔍</span> ITV</div>
+        <div class="menu-item" onclick="reportIncident('radar', '📷 Radar')"><span>📷</span> Radar</div>
+        <div class="menu-item" onclick="reportIncident('control_transito', '🚘 Control de Tránsito')"><span>🚘</span> Control de Tránsito</div>
+        <div class="menu-item" onclick="reportIncident('control_transporte', '🚌 Control Transporte')"><span>🚌</span> Control Transporte</div>
+        <div class="menu-item" onclick="reportIncident('control_policial', '🚨 Control Policial')"><span>🚨</span> Control Policial</div>
       </div>
+      <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
     </div>
 
-    <button class="fab-btn fab-gps" onclick="getUserLocation()">🎯</button>
+    <!-- Burbuja 2: Alerta Triangular (Imprevistos Viales) -->
+    <div class="bubble-group">
+      <div class="menu-options" id="alertOptions">
+        <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')"><span>🕳️</span> Bache</div>
+        <div class="menu-item" onclick="reportIncident('manifestacion', '🪧 Manifestación')"><span>🪧</span> Manifestación</div>
+        <div class="menu-item" onclick="reportIncident('corte', '🚧 Corte de Calle')"><span>🚧</span> Corte de Calle</div>
+      </div>
+      <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
+    </div>
   </div>
 
-  <!-- Panel Inferior -->
-  <div id="navPanel" class="overlay nav-panel" style="display:none;">
+  <!-- Panel Navegación Inferior -->
+  <div class="nav-panel overlay" id="navPanel" style="display:none;">
     <div class="nav-instruction">
-      <div class="street">Ruta calculada</div>
-      <div class="distance" id="navDistance">0.0 km</div>
+      <div class="distance" id="navDistance">--</div>
+      <div class="street" id="navStreet">Ruta Lista</div>
+      <div class="detail" id="navDetail" style="color:#94a3b8; font-size:14px;">Tocá "Iniciar viaje" para comenzar</div>
     </div>
     <div style="display:flex; gap:8px;">
-      <button id="btnStart" class="btn btn-success" style="flex:1;" onclick="startNavigation()">▶️ Iniciar</button>
-      <button id="btnStop" class="btn btn-danger" style="flex:1; display:none;" onclick="stopNavigation()">⏹️ Detener</button>
+      <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
+      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío Seguro</button>
+      <button class="btn btn-primary" id="btnNextDetour" style="display:none; flex:0.6;" onclick="cycleNextDetour()">🔀 Otro Atajo</button>
+      <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Finalizar</button>
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
+  <div class="toast" id="toast"></div>
 
-  <!-- DIV DEL MAPA -->
-  <div id="map"></div>
-
-  <!-- Leaflet JS desde Cloudflare -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-
-  <!-- JS local con versión -->
   <script>
-    const appScript = document.createElement('script');
-    appScript.src = 'app.js?v=' + Date.now();
-    document.body.appendChild(appScript);
+    // ELIMINACIÓN AUTOMÁTICA DE CACHÉ DE SERVICE WORKERS
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) { registration.unregister(); }
+      });
+    }
+
+    const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
+    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    const DEFAULT_ORIGIN = [-31.4201, -64.1888];
+
+    let map, userPos = null, destPos = null;
+    let currentRoute = null, detourRoute = null;
+    let availableDetours = [];
+    let currentDetourIndex = 0;
+
+    let routeLayer = null, detourLayer = null;
+    let userMarker = null, destMarker = null;
+    let activeIncidents = [];
+    let debounceTimer = null;
+    let settingOriginMode = false;
+    let activeInputTarget = 'dest';
+
+    const SAFETY_BUFFER_METERS = 100;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap();
+      getUserLocation();
+    });
+
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
+
+      // Mosaico de calles de alta velocidad (CartoDB Voyager)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      // FORZAR A LEAFLET A RECALCULAR TAMAÑO (Evita pantalla gris)
+      setTimeout(() => { map.invalidateSize(); }, 300);
+      window.addEventListener('resize', () => { map.invalidateSize(); });
+
+      map.on('click', function(e) {
+        document.getElementById('suggestions').style.display = 'none';
+        closeAllMenus();
+        
+        if (settingOriginMode) {
+          setOriginFromMap(e.latlng);
+          settingOriginMode = false;
+        } else {
+          setDestinationFromMap(e.latlng);
+        }
+      });
+    }
+
+    function getUserLocation() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          userPos = [pos.coords.latitude, pos.coords.longitude];
+          document.getElementById('originInput').value = 'Mi ubicación actual';
+          updateUserMarker();
+          map.setView(userPos, 15);
+          showToast('📍 Ubicación detectada');
+        },
+        () => {
+          userPos = DEFAULT_ORIGIN;
+          document.getElementById('originInput').value = 'Córdoba Centro';
+          updateUserMarker();
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    function updateUserMarker() {
+      if (!userPos) return;
+      if (!userMarker) {
+        userMarker = L.marker(userPos, {
+          icon: L.divIcon({
+            html: '<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px #3b82f6;"></div>',
+            iconSize: [20, 20], iconAnchor: [10, 10]
+          })
+        }).addTo(map);
+      } else {
+        userMarker.setLatLng(userPos);
+      }
+    }
+
+    function enableSetOriginMode() {
+      settingOriginMode = true;
+      showToast('👉 Tocá en el mapa para fijar tu ORIGEN (🚗)');
+    }
+
+    async function setOriginFromMap(latlng) {
+      userPos = [latlng.lat, latlng.lng];
+      updateUserMarker();
+      
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          document.getElementById('originInput').value = data.display_name.split(',')[0];
+        }
+      } catch(e){}
+
+      if (destPos) recalculateSmartRoute();
+    }
+
+    async function setDestinationFromMap(latlng) {
+      destPos = [latlng.lat, latlng.lng];
+
+      if (destMarker) map.removeLayer(destMarker);
+      destMarker = L.marker(destPos, {
+        icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+      }).addTo(map);
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          document.getElementById('destInput').value = data.display_name.split(',')[0];
+        }
+      } catch(e){}
+
+      if (userPos) recalculateSmartRoute();
+    }
+
+    function handleSearchInput(query, target) {
+      activeInputTarget = target;
+      clearTimeout(debounceTimer);
+      const suggBox = document.getElementById('suggestions');
+      
+      if (!query || query.trim().length < 2) {
+        suggBox.style.display = 'none'; 
+        return;
+      }
+
+      debounceTimer = setTimeout(async () => {
+        const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query + ', Córdoba, Argentina')}&format=json&limit=5`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          suggBox.innerHTML = '';
+          if (data && data.length > 0) {
+            data.forEach(place => {
+              const item = document.createElement('div');
+              item.className = 'suggestion-item';
+              item.textContent = place.display_name;
+              item.onclick = () => {
+                const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
+                
+                if (activeInputTarget === 'origin') {
+                  userPos = latlng;
+                  document.getElementById('originInput').value = place.display_name.split(',')[0];
+                  updateUserMarker();
+                } else {
+                  destPos = latlng;
+                  document.getElementById('destInput').value = place.display_name.split(',')[0];
+                  if (destMarker) map.removeLayer(destMarker);
+                  destMarker = L.marker(destPos, {
+                    icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                  }).addTo(map);
+                }
+
+                suggBox.style.display = 'none';
+                map.setView(latlng, 15);
+                if (userPos && destPos) recalculateSmartRoute();
+              };
+              suggBox.appendChild(item);
+            });
+            suggBox.style.display = 'block';
+          }
+        } catch (e) {}
+      }, 250);
+    }
+
+    function clearOrigin() {
+      userPos = null;
+      document.getElementById('originInput').value = '';
+      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+      clearRoutes();
+      showToast('Origen eliminado');
+    }
+
+    function clearDestination() {
+      destPos = null;
+      document.getElementById('destInput').value = '';
+      if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+      clearRoutes();
+      showToast('Destino eliminado');
+    }
+
+    function clearRoutes() {
+      if (routeLayer) map.removeLayer(routeLayer);
+      if (detourLayer) map.removeLayer(detourLayer);
+      document.getElementById('navPanel').style.display = 'none';
+    }
+
+    function toggleMenu(menuId) {
+      const target = document.getElementById(menuId);
+      const isOpen = target.classList.contains('active');
+      closeAllMenus();
+      if (!isOpen) target.classList.add('active');
+    }
+
+    function closeAllMenus() {
+      document.getElementById('hornOptions').classList.remove('active');
+      document.getElementById('alertOptions').classList.remove('active');
+    }
+
+    function reportIncident(type, label) {
+      closeAllMenus();
+      const centerPos = map.getCenter();
+      const emoji = label.split(' ')[0];
+      
+      const incidentMarker = L.marker(centerPos, {
+        draggable: true,
+        icon: L.divIcon({
+          html: `<div class="draggable-marker">${emoji}</div>`,
+          iconSize: [36, 36], iconAnchor: [18, 18]
+        })
+      }).addTo(map);
+
+      const incidentObj = { id: Date.now(), pos: [centerPos.lat, centerPos.lng], marker: incidentMarker };
+      activeIncidents.push(incidentObj);
+
+      const popupContent = document.createElement('div');
+      popupContent.style.textAlign = 'center';
+      popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div>`;
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'popup-delete-btn';
+      deleteBtn.innerHTML = '❌ Eliminar';
+      deleteBtn.onclick = () => { 
+        map.removeLayer(incidentMarker); 
+        activeIncidents = activeIncidents.filter(i => i.id !== incidentObj.id);
+        recalculateSmartRoute();
+      };
+      
+      popupContent.appendChild(deleteBtn);
+      incidentMarker.bindPopup(popupContent);
+
+      incidentMarker.on('dragend', function(event) {
+        const newPos = event.target.getLatLng();
+        incidentObj.pos = [newPos.lat, newPos.lng];
+        recalculateSmartRoute();
+      });
+
+      showToast(`¡${label} agregado! Reevaluando...`);
+      recalculateSmartRoute();
+    }
+
+    async function fetchOSRM(points) {
+      const coords = points.map(p => `${p[1]},${p[0]}`).join(';');
+      const url = `${OSRM_URL}${coords}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.code === 'Ok' && data.routes.length > 0) {
+          return data.routes.map(r => ({
+            coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+            distance: r.distance,
+            duration: r.duration
+          }));
+        }
+      } catch (e) {}
+      return [];
+    }
+
+    function calculateRoute() {
+      document.getElementById('suggestions').style.display = 'none';
+      if (!userPos || !destPos) {
+        showToast('⚠️ Definí Origen y Destino primero');
+        return;
+      }
+      recalculateSmartRoute();
+    }
+
+    function isRouteSafe(coords) {
+      if (activeIncidents.length === 0) return true;
+      return coords.every(coord => {
+        return activeIncidents.every(incident => {
+          return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
+        });
+      });
+    }
+
+    // ALGORITMO PARALELO ASÍNCRONO DE ALTA VELOCIDAD
+    async function recalculateSmartRoute() {
+      if (!userPos || !destPos) return;
+
+      const directRoutes = await fetchOSRM([userPos, destPos]);
+      if (directRoutes.length === 0) return;
+
+      currentRoute = directRoutes[0];
+      drawRoute(currentRoute.coords, '#3b82f6', false);
+      updateNavInfo(currentRoute);
+
+      if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
+        if (detourLayer) map.removeLayer(detourLayer);
+        document.getElementById('btnDetour').style.display = 'none';
+        document.getElementById('btnNextDetour').style.display = 'none';
+        availableDetours = [];
+        return;
+      }
+
+      // Pre-generamos waypoints concéntricos inmediatos
+      const offsets = [0.0012, -0.0012, 0.0022, -0.0022];
+      let promises = [];
+
+      for (let incident of activeIncidents) {
+        const cLat = incident.pos[0];
+        const cLng = incident.pos[1];
+
+        for (let latOff of offsets) {
+          for (let lngOff of offsets) {
+            const bypass = [cLat + latOff, cLng + lngOff];
+            // Solo probamos waypoints que estén libres
+            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
+              promises.push(fetchOSRM([userPos, bypass, destPos]));
+            }
+          }
+        }
+      }
+
+      // EJECUCIÓN PARALELA DE PETICIONES (MULTITHREAD)
+      const resultsArray = await Promise.all(promises);
+      let validCandidates = [];
+
+      resultsArray.forEach(routes => {
+        routes.forEach(tRoute => {
+          if (isRouteSafe(tRoute.coords)) {
+            if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 25)) {
+              validCandidates.push(tRoute);
+            }
+          }
+        });
+      });
+
+      if (validCandidates.length > 0) {
+        validCandidates.sort((a, b) => a.distance - b.distance);
+        availableDetours = validCandidates;
+        currentDetourIndex = 0;
+
+        renderCurrentDetour();
+        document.getElementById('btnDetour').style.display = 'block';
+        
+        if (availableDetours.length > 1) {
+          document.getElementById('btnNextDetour').style.display = 'block';
+        } else {
+          document.getElementById('btnNextDetour').style.display = 'none';
+        }
+
+        showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s) al instante`);
+      } else {
+        if (detourLayer) map.removeLayer(detourLayer);
+        document.getElementById('btnDetour').style.display = 'none';
+        document.getElementById('btnNextDetour').style.display = 'none';
+        availableDetours = [];
+        showToast('⚠️ No se hallaron desvíos libres cerca');
+      }
+    }
+
+    function renderCurrentDetour() {
+      if (availableDetours.length === 0) return;
+      detourRoute = availableDetours[currentDetourIndex];
+      drawRoute(detourRoute.coords, '#f59e0b', true);
+    }
+
+    function cycleNextDetour() {
+      if (availableDetours.length <= 1) return;
+      currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
+      renderCurrentDetour();
+      showToast(`🔀 Atajo ${currentDetourIndex + 1} de ${availableDetours.length}`);
+    }
+
+    function getDistanceMeters(p1, p2) {
+      const R = 6371000;
+      const dLat = (p2[0] - p1[0]) * Math.PI / 180;
+      const dLon = (p2[1] - p1[1]) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function drawRoute(coords, color, isDetour) {
+      if (isDetour && detourLayer) map.removeLayer(detourLayer);
+      if (!isDetour && routeLayer) map.removeLayer(routeLayer);
+
+      const layer = L.polyline(coords, { color: color, weight: isDetour ? 6 : 7, opacity: 0.9 }).addTo(map);
+
+      if (isDetour) detourLayer = layer;
+      else routeLayer = layer;
+    }
+
+    function updateNavInfo(routeData) {
+      document.getElementById('navPanel').style.display = 'flex';
+      document.getElementById('btnStart').style.display = 'block';
+      document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
+      document.getElementById('navStreet').textContent = 'Ruta Lista';
+    }
+
+    function activateDetour() {
+      if (!detourRoute) return;
+      drawRoute(detourRoute.coords, '#3b82f6', false);
+      if (detourLayer) map.removeLayer(detourLayer);
+      currentRoute = detourRoute;
+      document.getElementById('btnDetour').style.display = 'none';
+      document.getElementById('btnNextDetour').style.display = 'none';
+      showToast('Navegando por el atajo seleccionado');
+    }
+
+    function startNavigation() {
+      document.getElementById('btnStart').style.display = 'none';
+      document.getElementById('btnStop').style.display = 'block';
+      showToast('Navegación iniciada');
+    }
+
+    function stopNavigation() {
+      document.getElementById('btnStart').style.display = 'block';
+      document.getElementById('btnStop').style.display = 'none';
+      showToast('Navegación finalizada');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3500);
+    }
   </script>
 </body>
 </html>
