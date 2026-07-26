@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ruta Segura</title>
 
-  <!-- META TAGS ANTI-CACHÉ (Obliga al celular a pedir la versión más reciente) -->
+  <!-- META TAGS ANTI-CACHÉ (Obliga al celular/navegador a pedir siempre la versión nueva) -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -13,7 +13,7 @@
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <!-- Carga dinámica de styles.css (Rompe la caché en cada carga) -->
+  <!-- Carga dinámica de styles.css para romper la caché -->
   <script>
     const styleLink = document.createElement('link');
     styleLink.rel = 'stylesheet';
@@ -24,7 +24,7 @@
   <!-- Manifest PWA -->
   <link rel="manifest" href="manifest.json">
 
-  <!-- Borrador automático de caché / Service Workers guardados -->
+  <!-- Borrador automático de caché de Service Workers -->
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function(registrations) {
@@ -37,7 +37,7 @@
 </head>
 <body>
 
-  <!-- Overlay para controles flotantes superior -->
+  <!-- Overlay superior (Buscadores) -->
   <div class="overlay top-bar">
     <div class="search-box">
       <!-- Input Origen -->
@@ -63,7 +63,7 @@
     </div>
   </div>
 
-  <!-- Botones Flotantes (Bocina / Alertas / GPS) -->
+  <!-- Botones Flotantes (Alertas / Bocina / GPS) -->
   <div class="floating-controls">
     <!-- Menú Alertas -->
     <div class="bubble-group">
@@ -113,7 +113,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Carga dinámica de app.js (Rompe la caché en cada carga) -->
+  <!-- Carga dinámica de app.js para romper la caché -->
   <script>
     const appScript = document.createElement('script');
     appScript.src = 'app.js?v=' + Date.now();
