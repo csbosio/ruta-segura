@@ -26,7 +26,7 @@ body, html {
 }
 
 #map .leaflet-tile-pane {
-  /* Transforma el mapa oscuro a fondo azul marino con trazos en amarillo neón */
+  /* Filtro que transforma el mapa en fondo azul marino con trazos en amarillo neón */
   filter: invert(100%) hue-rotate(190deg) brightness(0.9) contrast(1.5) saturate(2.2);
 }
 
