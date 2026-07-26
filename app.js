@@ -17,25 +17,25 @@ let settingOriginMode = false;
 // Coordenadas por defecto (Córdoba, Argentina)
 const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
-// Inicialización de la Aplicación
+// Inicialización
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   getUserLocation();
 });
 
-// Inicializar Mapa usando OpenStreetMap estándar (Ultra confiable)
+// Inicializar Mapa con capa Gris Claro Nativa (CartoDB Positron)
 function initMap() {
   map = L.map('map', { 
     zoomControl: false,
     attributionControl: false
   }).setView(DEFAULT_ORIGIN, 14);
 
-  // Servidor OpenStreetMap estándar (NUNCA falla ni bloquea)
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19
+  // Servidor de mapas Gris Claro Nativo (CARTO Positron - Sin CSS hacky)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd'
   }).addTo(map);
 
-  // Redibujado automático para evitar cualquier fallo de tamaño
   setTimeout(() => {
     map.invalidateSize();
   }, 100);
@@ -74,7 +74,7 @@ function getUserLocation() {
         if (!userMarker) {
           userMarker = L.circleMarker(userLatLng, {
             radius: 9,
-            fillColor: '#00ffff',
+            fillColor: '#2563eb',
             color: '#ffffff',
             weight: 3,
             opacity: 1,
@@ -196,7 +196,7 @@ function calculateRoute() {
         const route = data.routes[0];
         const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-        drawRoute(coords, '#ff007f', false); // Ruta en magenta/fucsia para máximo contraste
+        drawRoute(coords, '#2563eb', false); // Ruta en Azul Intenso
 
         const distanceKm = (route.distance / 1000).toFixed(1);
         document.getElementById('navDistance').innerText = `${distanceKm} km`;
@@ -213,7 +213,7 @@ function drawRoute(coords, color, isDetour) {
   if (isDetour && detourLayer) map.removeLayer(detourLayer);
   if (!isDetour && routeLayer) map.removeLayer(routeLayer);
 
-  const layer = L.polyline(coords, { color: color, weight: 8, opacity: 0.9 }).addTo(map);
+  const layer = L.polyline(coords, { color: color, weight: 7, opacity: 0.9 }).addTo(map);
 
   if (isDetour) detourLayer = layer;
   else routeLayer = layer;
