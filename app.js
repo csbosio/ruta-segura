@@ -23,23 +23,26 @@ document.addEventListener('DOMContentLoaded', () => {
   getUserLocation();
 });
 
-// Inicializar Mapa
+// Inicializar Mapa usando OpenStreetMap estándar (Ultra confiable)
 function initMap() {
   map = L.map('map', { 
     zoomControl: false,
     attributionControl: false
   }).setView(DEFAULT_ORIGIN, 14);
 
-  // Capa base Carto DarkMatter
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    subdomains: 'abcd'
+  // Servidor OpenStreetMap estándar (NUNCA falla ni bloquea)
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
   }).addTo(map);
 
-  // Fuerza el redibujado inmediato del mapa para evitar pantallazos negros
+  // Redibujado automático para evitar cualquier fallo de tamaño
   setTimeout(() => {
     map.invalidateSize();
-  }, 200);
+  }, 100);
+
+  window.addEventListener('resize', () => {
+    map.invalidateSize();
+  });
 
   map.on('click', function(e) {
     document.getElementById('suggestions').style.display = 'none';
@@ -193,7 +196,7 @@ function calculateRoute() {
         const route = data.routes[0];
         const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-        drawRoute(coords, '#ffe600', false); // Ruta principal en amarillo neón
+        drawRoute(coords, '#ff007f', false); // Ruta en magenta/fucsia para máximo contraste
 
         const distanceKm = (route.distance / 1000).toFixed(1);
         document.getElementById('navDistance').innerText = `${distanceKm} km`;
