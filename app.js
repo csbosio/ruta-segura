@@ -1,4 +1,4 @@
-// Desregistro automático de Service Workers antiguos
+// Desregistro automático de Service Workers antiguos para forzar actualización
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     for (let registration of registrations) { registration.unregister(); }
@@ -30,7 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+  // MAPA FUTURISTA EN MODO OSCURO (CartoDB Dark Matter)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd',
+    attribution: '&copy; OpenStreetMap &copy; CARTO'
+  }).addTo(map);
 
   map.on('click', function(e) {
     document.getElementById('suggestions').style.display = 'none';
@@ -69,8 +75,9 @@ function updateUserMarker() {
   if (!userMarker) {
     userMarker = L.marker(userPos, {
       icon: L.divIcon({
-        html: '<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px #3b82f6;"></div>',
-        iconSize: [20, 20], iconAnchor: [10, 10]
+        className: 'custom-icon-marker',
+        html: '<div style="width:24px;height:24px;background:#00f2fe;border-radius:50%;border:3px solid #fff;box-shadow:0 0 15px #00f2fe;"></div>',
+        iconSize: [24, 24], iconAnchor: [12, 12]
       })
     }).addTo(map);
   } else {
@@ -103,7 +110,12 @@ async function setDestinationFromMap(latlng) {
 
   if (destMarker) map.removeLayer(destMarker);
   destMarker = L.marker(destPos, {
-    icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+    icon: L.divIcon({
+      className: 'custom-icon-marker',
+      html: '<div style="font-size:36px; filter: drop-shadow(0 0 8px #00f2fe);">🏁</div>',
+      iconSize: [40, 40],
+      iconAnchor: [20, 40]
+    })
   }).addTo(map);
 
   try {
@@ -150,7 +162,12 @@ function handleSearchInput(query, target) {
               document.getElementById('destInput').value = place.display_name.split(',')[0];
               if (destMarker) map.removeLayer(destMarker);
               destMarker = L.marker(destPos, {
-                icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                icon: L.divIcon({
+                  className: 'custom-icon-marker',
+                  html: '<div style="font-size:36px; filter: drop-shadow(0 0 8px #00f2fe);">🏁</div>',
+                  iconSize: [40, 40],
+                  iconAnchor: [20, 40]
+                })
               }).addTo(map);
             }
 
@@ -200,6 +217,7 @@ function closeAllMenus() {
   document.getElementById('alertOptions').classList.remove('active');
 }
 
+// REPORTAR INCIDENTE CON ÍCONOS MÁS GRANDES Y SIN MARCO NEGRO
 function reportIncident(type, label) {
   closeAllMenus();
   const centerPos = map.getCenter();
@@ -208,8 +226,10 @@ function reportIncident(type, label) {
   const incidentMarker = L.marker(centerPos, {
     draggable: true,
     icon: L.divIcon({
+      className: 'custom-icon-marker',
       html: `<div class="draggable-marker">${emoji}</div>`,
-      iconSize: [36, 36], iconAnchor: [18, 18]
+      iconSize: [50, 50], 
+      iconAnchor: [25, 25]
     })
   }).addTo(map);
 
@@ -218,7 +238,7 @@ function reportIncident(type, label) {
 
   const popupContent = document.createElement('div');
   popupContent.style.textAlign = 'center';
-  popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div>`;
+  popupContent.innerHTML = `<div style="font-weight:bold; color:#00f2fe;">${label}</div>`;
   
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'popup-delete-btn';
@@ -284,7 +304,7 @@ async function recalculateSmartRoute() {
   if (directRoutes.length === 0) return;
 
   currentRoute = directRoutes[0];
-  drawRoute(currentRoute.coords, '#3b82f6', false);
+  drawRoute(currentRoute.coords, '#00f2fe', false); // Color Neón Cían para la ruta principal
   updateNavInfo(currentRoute);
 
   if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
@@ -352,7 +372,7 @@ async function recalculateSmartRoute() {
 function renderCurrentDetour() {
   if (availableDetours.length === 0) return;
   detourRoute = availableDetours[currentDetourIndex];
-  drawRoute(detourRoute.coords, '#f59e0b', true);
+  drawRoute(detourRoute.coords, '#ff007f', true); // Color Neón Magenta para los desvíos
 }
 
 function cycleNextDetour() {
@@ -391,7 +411,7 @@ function updateNavInfo(routeData) {
 
 function activateDetour() {
   if (!detourRoute) return;
-  drawRoute(detourRoute.coords, '#3b82f6', false);
+  drawRoute(detourRoute.coords, '#00f2fe', false);
   if (detourLayer) map.removeLayer(detourLayer);
   currentRoute = detourRoute;
   document.getElementById('btnDetour').style.display = 'none';
