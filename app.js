@@ -1,38 +1,34 @@
-// Desregistro automático de Service Workers antiguos
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    for (let registration of registrations) { registration.unregister(); }
-  });
-}
+// Variables Globales
+let map;
+let userMarker = null;
+let originMarker = null;
+let destMarker = null;
 
-const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+let routeLayer = null;
+let detourLayer = null;
+
+let originCoords = null;
+let destCoords = null;
+
+let isNavigating = false;
+let watchId = null;
+let settingOriginMode = false;
+
+// Coordenadas por defecto (Córdoba, Argentina)
 const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
-let map, userPos = null, destPos = null;
-let currentRoute = null, detourRoute = null;
-let availableDetours = [];
-let currentDetourIndex = 0;
-
-let routeLayer = null, detourLayer = null;
-let userMarker = null, destMarker = null;
-let activeIncidents = [];
-let debounceTimer = null;
-let settingOriginMode = false;
-let activeInputTarget = 'dest';
-
-const SAFETY_BUFFER_METERS = 100;
-
+// Inicialización de la Aplicación
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   getUserLocation();
 });
 
+// Inicializar Mapa con Capa Oscura + Filtro CSS
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
 
-  // MAPA OSCURO DE ALTO CONTRASTE (Las calles se ven blancas/claras y las avenidas naranjas/neón)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  // Capa base Carto DarkMatter
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
     subdomains: 'abcd',
     attribution: '&copy; OpenStreetMap &copy; CARTO'
@@ -51,388 +47,215 @@ function initMap() {
   });
 }
 
+// Obtener Ubicación del Usuario
 function getUserLocation() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    pos => {
-      userPos = [pos.coords.latitude, pos.coords.longitude];
-      document.getElementById('originInput').value = 'Mi ubicación actual';
-      updateUserMarker();
-      map.setView(userPos, 15);
-      showToast('📍 Ubicación detectada');
-    },
-    () => {
-      userPos = DEFAULT_ORIGIN;
-      document.getElementById('originInput').value = 'Córdoba Centro';
-      updateUserMarker();
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-}
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const userLatLng = [lat, lng];
 
-function updateUserMarker() {
-  if (!userPos) return;
-  if (!userMarker) {
-    userMarker = L.marker(userPos, {
-      icon: L.divIcon({
-        className: 'custom-icon-marker',
-        html: '<div style="width:28px;height:28px;background:#00f2fe;border-radius:50%;border:3px solid #000;box-shadow:0 0 15px #00f2fe;"></div>',
-        iconSize: [28, 28], iconAnchor: [14, 14]
-      })
-    }).addTo(map);
-  } else {
-    userMarker.setLatLng(userPos);
+        if (!originCoords) {
+          originCoords = userLatLng;
+          document.getElementById('originInput').value = "Mi ubicación actual";
+        }
+
+        if (!userMarker) {
+          userMarker = L.circleMarker(userLatLng, {
+            radius: 9,
+            fillColor: '#00ffff',
+            color: '#ffffff',
+            weight: 3,
+            opacity: 1,
+            fillOpacity: 0.9
+          }).addTo(map);
+        } else {
+          userMarker.setLatLng(userLatLng);
+        }
+
+        map.setView(userLatLng, 15);
+      },
+      (error) => {
+        showToast("⚠️ No se pudo obtener la ubicación");
+      },
+      { enableHighAccuracy: true }
+    );
   }
 }
 
+// Activar modo fijar origen en mapa
 function enableSetOriginMode() {
   settingOriginMode = true;
-  showToast('👉 Tocá en el mapa para fijar tu ORIGEN (🚗)');
+  showToast("📍 Toca el mapa para fijar el ORIGEN");
 }
 
-async function setOriginFromMap(latlng) {
-  userPos = [latlng.lat, latlng.lng];
-  updateUserMarker();
+function setOriginFromMap(latlng) {
+  originCoords = [latlng.lat, latlng.lng];
+  document.getElementById('originInput').value = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`;
   
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
-    const data = await res.json();
-    if (data && data.display_name) {
-      document.getElementById('originInput').value = data.display_name.split(',')[0];
-    }
-  } catch(e){}
-
-  if (destPos) recalculateSmartRoute();
+  if (originMarker) map.removeLayer(originMarker);
+  originMarker = L.marker(latlng).addTo(map).bindPopup("Origen").openPopup();
 }
 
-async function setDestinationFromMap(latlng) {
-  destPos = [latlng.lat, latlng.lng];
-
+function setDestinationFromMap(latlng) {
+  destCoords = [latlng.lat, latlng.lng];
+  document.getElementById('destInput').value = `${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`;
+  
   if (destMarker) map.removeLayer(destMarker);
-  destMarker = L.marker(destPos, {
-    icon: L.divIcon({
-      className: 'custom-icon-marker',
-      html: '<div style="font-size:40px; filter: drop-shadow(0 0 10px #000);">🏁</div>',
-      iconSize: [44, 44],
-      iconAnchor: [22, 44]
-    })
-  }).addTo(map);
-
-  try {
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
-    const data = await res.json();
-    if (data && data.display_name) {
-      document.getElementById('destInput').value = data.display_name.split(',')[0];
-    }
-  } catch(e){}
-
-  if (userPos) recalculateSmartRoute();
-}
-
-function handleSearchInput(query, target) {
-  activeInputTarget = target;
-  clearTimeout(debounceTimer);
-  const suggBox = document.getElementById('suggestions');
-  
-  if (!query || query.trim().length < 2) {
-    suggBox.style.display = 'none'; 
-    return;
-  }
-
-  debounceTimer = setTimeout(async () => {
-    const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query + ', Córdoba, Argentina')}&format=json&limit=5`;
-    try {
-      const res = await fetch(url);
-      const data = await res.json();
-      suggBox.innerHTML = '';
-      if (data && data.length > 0) {
-        data.forEach(place => {
-          const item = document.createElement('div');
-          item.className = 'suggestion-item';
-          item.textContent = place.display_name;
-          item.onclick = () => {
-            const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
-            
-            if (activeInputTarget === 'origin') {
-              userPos = latlng;
-              document.getElementById('originInput').value = place.display_name.split(',')[0];
-              updateUserMarker();
-            } else {
-              destPos = latlng;
-              document.getElementById('destInput').value = place.display_name.split(',')[0];
-              if (destMarker) map.removeLayer(destMarker);
-              destMarker = L.marker(destPos, {
-                icon: L.divIcon({
-                  className: 'custom-icon-marker',
-                  html: '<div style="font-size:40px; filter: drop-shadow(0 0 10px #000);">🏁</div>',
-                  iconSize: [44, 44],
-                  iconAnchor: [22, 44]
-                })
-              }).addTo(map);
-            }
-
-            suggBox.style.display = 'none';
-            map.setView(latlng, 15);
-            if (userPos && destPos) recalculateSmartRoute();
-          };
-          suggBox.appendChild(item);
-        });
-        suggBox.style.display = 'block';
-      }
-    } catch (e) {}
-  }, 250);
+  destMarker = L.marker(latlng).addTo(map).bindPopup("Destino").openPopup();
 }
 
 function clearOrigin() {
-  userPos = null;
-  document.getElementById('originInput').value = '';
-  if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
-  clearRoutes();
-  showToast('Origen eliminado');
+  originCoords = null;
+  document.getElementById('originInput').value = "";
+  if (originMarker) map.removeLayer(originMarker);
 }
 
 function clearDestination() {
-  destPos = null;
-  document.getElementById('destInput').value = '';
-  if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
-  clearRoutes();
-  showToast('Destino eliminado');
-}
-
-function clearRoutes() {
+  destCoords = null;
+  document.getElementById('destInput').value = "";
+  if (destMarker) map.removeLayer(destMarker);
   if (routeLayer) map.removeLayer(routeLayer);
   if (detourLayer) map.removeLayer(detourLayer);
   document.getElementById('navPanel').style.display = 'none';
 }
 
-function toggleMenu(menuId) {
-  const target = document.getElementById(menuId);
-  const isOpen = target.classList.contains('active');
-  closeAllMenus();
-  if (!isOpen) target.classList.add('active');
+// Búsqueda Autocompletada con Nominatim
+let searchTimeout;
+function handleSearchInput(query, type) {
+  clearTimeout(searchTimeout);
+  const suggestionsBox = document.getElementById('suggestions');
+
+  if (query.length < 3) {
+    suggestionsBox.style.display = 'none';
+    return;
+  }
+
+  searchTimeout = setTimeout(() => {
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4&countrycodes=ar`)
+      .then(res => res.json())
+      .then(data => {
+        suggestionsBox.innerHTML = '';
+        if (data.length === 0) {
+          suggestionsBox.style.display = 'none';
+          return;
+        }
+
+        data.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'suggestion-item';
+          div.innerText = item.display_name;
+          div.onclick = () => {
+            const latlng = [parseFloat(item.lat), parseFloat(item.lon)];
+            if (type === 'origin') {
+              originCoords = latlng;
+              document.getElementById('originInput').value = item.display_name.split(',')[0];
+              if (originMarker) map.removeLayer(originMarker);
+              originMarker = L.marker(latlng).addTo(map);
+            } else {
+              destCoords = latlng;
+              document.getElementById('destInput').value = item.display_name.split(',')[0];
+              if (destMarker) map.removeLayer(destMarker);
+              destMarker = L.marker(latlng).addTo(map);
+            }
+            suggestionsBox.style.display = 'none';
+            map.setView(latlng, 15);
+          };
+          suggestionsBox.appendChild(div);
+        });
+
+        suggestionsBox.style.display = 'block';
+      });
+  }, 300);
 }
 
-function closeAllMenus() {
-  document.getElementById('hornOptions').classList.remove('active');
-  document.getElementById('alertOptions').classList.remove('active');
-}
-
-function reportIncident(type, label) {
-  closeAllMenus();
-  const centerPos = map.getCenter();
-  const emoji = label.split(' ')[0];
-  
-  const incidentMarker = L.marker(centerPos, {
-    draggable: true,
-    icon: L.divIcon({
-      className: 'custom-icon-marker',
-      html: `<div class="draggable-marker">${emoji}</div>`,
-      iconSize: [50, 50], 
-      iconAnchor: [25, 25]
-    })
-  }).addTo(map);
-
-  const incidentObj = { id: Date.now(), pos: [centerPos.lat, centerPos.lng], marker: incidentMarker };
-  activeIncidents.push(incidentObj);
-
-  const popupContent = document.createElement('div');
-  popupContent.style.textAlign = 'center';
-  popupContent.innerHTML = `<div style="font-weight:bold; color:#00f2fe;">${label}</div>`;
-  
-  const deleteBtn = document.createElement('button');
-  deleteBtn.className = 'popup-delete-btn';
-  deleteBtn.innerHTML = '❌ Eliminar';
-  deleteBtn.onclick = () => { 
-    map.removeLayer(incidentMarker); 
-    activeIncidents = activeIncidents.filter(i => i.id !== incidentObj.id);
-    recalculateSmartRoute();
-  };
-  
-  popupContent.appendChild(deleteBtn);
-  incidentMarker.bindPopup(popupContent);
-
-  incidentMarker.on('dragend', function(event) {
-    const newPos = event.target.getLatLng();
-    incidentObj.pos = [newPos.lat, newPos.lng];
-    recalculateSmartRoute();
-  });
-
-  showToast(`¡${label} agregado! Reevaluando...`);
-  recalculateSmartRoute();
-}
-
-async function fetchOSRM(points) {
-  const coords = points.map(p => `${p[1]},${p[0]}`).join(';');
-  const url = `${OSRM_URL}${coords}?overview=full&geometries=geojson&steps=true&alternatives=true`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data.code === 'Ok' && data.routes.length > 0) {
-      return data.routes.map(r => ({
-        coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
-        distance: r.distance,
-        duration: r.duration
-      }));
-    }
-  } catch (e) {}
-  return [];
-}
-
+// Cálculo de Ruta OSRM
 function calculateRoute() {
-  document.getElementById('suggestions').style.display = 'none';
-  if (!userPos || !destPos) {
-    showToast('⚠️ Definí Origen y Destino primero');
-    return;
-  }
-  recalculateSmartRoute();
-}
-
-function isRouteSafe(coords) {
-  if (activeIncidents.length === 0) return true;
-  return coords.every(coord => {
-    return activeIncidents.every(incident => {
-      return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
-    });
-  });
-}
-
-async function recalculateSmartRoute() {
-  if (!userPos || !destPos) return;
-
-  const directRoutes = await fetchOSRM([userPos, destPos]);
-  if (directRoutes.length === 0) return;
-
-  currentRoute = directRoutes[0];
-  drawRoute(currentRoute.coords, '#0055ff', false);
-  updateNavInfo(currentRoute);
-
-  if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
-    if (detourLayer) map.removeLayer(detourLayer);
-    document.getElementById('btnDetour').style.display = 'none';
-    document.getElementById('btnNextDetour').style.display = 'none';
-    availableDetours = [];
+  if (!originCoords || !destCoords) {
+    showToast("⚠️ Ingresá origen y destino");
     return;
   }
 
-  const offsets = [0.0012, -0.0012, 0.0022, -0.0022];
-  let promises = [];
+  const url = `https://router.project-osrm.org/route/v1/driving/${originCoords[1]},${originCoords[0]};${destCoords[1]},${destCoords[0]}?overview=full&geometries=geojson`;
 
-  for (let incident of activeIncidents) {
-    const cLat = incident.pos[0];
-    const cLng = incident.pos[1];
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
 
-    for (let latOff of offsets) {
-      for (let lngOff of offsets) {
-        const bypass = [cLat + latOff, cLng + lngOff];
-        if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
-          promises.push(fetchOSRM([userPos, bypass, destPos]));
-        }
-      }
-    }
-  }
+        drawRoute(coords, '#ffe600', false); // Ruta principal en amarillo neón
 
-  const resultsArray = await Promise.all(promises);
-  let validCandidates = [];
+        const distanceKm = (route.distance / 1000).toFixed(1);
+        document.getElementById('navDistance').innerText = `${distanceKm} km`;
+        document.getElementById('navPanel').style.display = 'flex';
 
-  resultsArray.forEach(routes => {
-    routes.forEach(tRoute => {
-      if (isRouteSafe(tRoute.coords)) {
-        if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 25)) {
-          validCandidates.push(tRoute);
-        }
+        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+      } else {
+        showToast("❌ No se encontró ruta");
       }
     });
-  });
-
-  if (validCandidates.length > 0) {
-    validCandidates.sort((a, b) => a.distance - b.distance);
-    availableDetours = validCandidates;
-    currentDetourIndex = 0;
-
-    renderCurrentDetour();
-    document.getElementById('btnDetour').style.display = 'block';
-    
-    if (availableDetours.length > 1) {
-      document.getElementById('btnNextDetour').style.display = 'block';
-    } else {
-      document.getElementById('btnNextDetour').style.display = 'none';
-    }
-
-    showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s)`);
-  } else {
-    if (detourLayer) map.removeLayer(detourLayer);
-    document.getElementById('btnDetour').style.display = 'none';
-    document.getElementById('btnNextDetour').style.display = 'none';
-    availableDetours = [];
-    showToast('⚠️ No se hallaron desvíos libres cerca');
-  }
-}
-
-function renderCurrentDetour() {
-  if (availableDetours.length === 0) return;
-  detourRoute = availableDetours[currentDetourIndex];
-  drawRoute(detourRoute.coords, '#ff0055', true);
-}
-
-function cycleNextDetour() {
-  if (availableDetours.length <= 1) return;
-  currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
-  renderCurrentDetour();
-  showToast(`🔀 Atajo ${currentDetourIndex + 1} de ${availableDetours.length}`);
-}
-
-function getDistanceMeters(p1, p2) {
-  const R = 6371000;
-  const dLat = (p2[0] - p1[0]) * Math.PI / 180;
-  const dLon = (p2[1] - p1[1]) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
 function drawRoute(coords, color, isDetour) {
   if (isDetour && detourLayer) map.removeLayer(detourLayer);
   if (!isDetour && routeLayer) map.removeLayer(routeLayer);
 
-  const layer = L.polyline(coords, { color: color, weight: isDetour ? 7 : 8, opacity: 0.95 }).addTo(map);
+  const layer = L.polyline(coords, { color: color, weight: 8, opacity: 0.9 }).addTo(map);
 
   if (isDetour) detourLayer = layer;
   else routeLayer = layer;
 }
 
-function updateNavInfo(routeData) {
-  document.getElementById('navPanel').style.display = 'flex';
-  document.getElementById('btnStart').style.display = 'block';
-  document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
-  document.getElementById('navStreet').textContent = 'Ruta Lista';
-}
-
-function activateDetour() {
-  if (!detourRoute) return;
-  drawRoute(detourRoute.coords, '#0055ff', false);
-  if (detourLayer) map.removeLayer(detourLayer);
-  currentRoute = detourRoute;
-  document.getElementById('btnDetour').style.display = 'none';
-  document.getElementById('btnNextDetour').style.display = 'none';
-  showToast('Navegando por el atajo seleccionado');
-}
-
+// Control de Navegación GPS
 function startNavigation() {
+  isNavigating = true;
   document.getElementById('btnStart').style.display = 'none';
   document.getElementById('btnStop').style.display = 'block';
-  showToast('Navegación iniciada');
+  showToast("▶️ Navegación iniciada");
+
+  if ('geolocation' in navigator) {
+    watchId = navigator.geolocation.watchPosition((pos) => {
+      const userLatLng = [pos.coords.latitude, pos.coords.longitude];
+      if (userMarker) userMarker.setLatLng(userLatLng);
+      map.setView(userLatLng, 17);
+    }, null, { enableHighAccuracy: true });
+  }
 }
 
 function stopNavigation() {
+  isNavigating = false;
   document.getElementById('btnStart').style.display = 'block';
   document.getElementById('btnStop').style.display = 'none';
-  showToast('Navegación finalizada');
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+  showToast("⏹️ Navegación detenida");
 }
 
-function showToast(msg) {
+// Gestión de Menús y Alertas
+function toggleMenu(menuId) {
+  const menu = document.getElementById(menuId);
+  const isVisible = menu.style.display === 'flex';
+  closeAllMenus();
+  menu.style.display = isVisible ? 'none' : 'flex';
+}
+
+function closeAllMenus() {
+  document.getElementById('alertOptions').style.display = 'none';
+  document.getElementById('hornOptions').style.display = 'none';
+}
+
+function reportIncident(type, label) {
+  closeAllMenus();
+  showToast(`Aviso enviado: ${label}`);
+}
+
+function showToast(message) {
   const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3500);
+  toast.innerText = message;
+  toast.style.display = 'block';
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 3000);
 }
