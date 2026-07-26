@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Ruta Segura v8 - Multi-Obstáculos</title>
+  <title>Ruta Segura - Atajos Cortos</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -32,6 +32,7 @@
     }
     .search-box { flex: 1; display: flex; flex-direction: column; gap: 8px; position: relative; }
     
+    /* Filas de Input Independientes */
     .input-row {
       display: flex; align-items: center; background: rgba(30,41,59,0.95);
       border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 2px 8px;
@@ -217,7 +218,7 @@
     let settingOriginMode = false;
     let activeInputTarget = 'dest';
 
-    const SAFETY_BUFFER_METERS = 150; // Distancia mínima respetada frente a cualquier alerta
+    const SAFETY_BUFFER_METERS = 100; // Radio ajustado para permitir esquivar a 1 sola cuadra
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -464,7 +465,6 @@
       recalculateSmartRoute();
     }
 
-    // Comprueba si una traza es 100% segura frente a TODOS los obstáculos cargados
     function isRouteSafe(coords) {
       if (activeIncidents.length === 0) return true;
       return coords.every(coord => {
@@ -484,53 +484,46 @@
       drawRoute(currentRoute.coords, '#3b82f6', false);
       updateNavInfo(currentRoute);
 
-      // Si no hay incidentes o la ruta original está completamente libre
       if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
         if (detourLayer) map.removeLayer(detourLayer);
         document.getElementById('btnDetour').style.display = 'none';
         return;
       }
 
-      // Si la ruta pasa cerca de AL MENOS UN obstáculo, calculamos desvíos
-      let bestDetour = null;
-      let minDistance = Infinity;
-
-      // Creamos waypoints de desvío con distancias progresivas (300m y 500m)
-      const offsets = [0.003, -0.003, 0.005, -0.005];
+      let candidateRoutes = [];
+      // Distancias cortas (~1 a 2 cuadras: 0.001 deg ≈ 110 metros)
+      const closeOffsets = [0.001, -0.001, 0.0018, -0.0018, 0.0025, -0.0025];
 
       for (let incident of activeIncidents) {
         const cLat = incident.pos[0];
         const cLng = incident.pos[1];
 
-        let bypassCandidates = [];
-        for (let latOff of offsets) {
-          for (let lngOff of offsets) {
-            bypassCandidates.push([cLat + latOff, cLng + lngOff]);
-          }
-        }
-
-        // Probamos rutas compuestas que esquiven la zona afectada
-        for (let bypass of bypassCandidates) {
-          const testRoutes = await fetchOSRM([userPos, bypass, destPos]);
-          for (let tRoute of testRoutes) {
-            // Validación MULTI-OBSTÁCULO: la ruta no puede tocar NINGÚN incidente
-            if (isRouteSafe(tRoute.coords) && tRoute.distance < minDistance) {
-              minDistance = tRoute.distance;
-              bestDetour = tRoute;
+        for (let latOff of closeOffsets) {
+          for (let lngOff of closeOffsets) {
+            const bypass = [cLat + latOff, cLng + lngOff];
+            
+            const testRoutes = await fetchOSRM([userPos, bypass, destPos]);
+            for (let tRoute of testRoutes) {
+              if (isRouteSafe(tRoute.coords)) {
+                candidateRoutes.push(tRoute);
+              }
             }
           }
         }
       }
 
-      if (bestDetour) {
-        detourRoute = bestDetour;
+      if (candidateRoutes.length > 0) {
+        // Ordenamos para priorizar SIEMPRE el atajo con la menor distancia total
+        candidateRoutes.sort((a, b) => a.distance - b.distance);
+        
+        detourRoute = candidateRoutes[0];
         drawRoute(detourRoute.coords, '#f59e0b', true);
         document.getElementById('btnDetour').style.display = 'block';
-        showToast('⚡ Atajo seguro disponible (esquivando todos los cortes)');
+        showToast('⚡ Atajo óptimo calculado');
       } else {
         if (detourLayer) map.removeLayer(detourLayer);
         document.getElementById('btnDetour').style.display = 'none';
-        showToast('⚠️ Zona bloqueada: No se encontró ruta alternativa segura');
+        showToast('⚠️ Zona bloqueada: No se halló desvío cercano');
       }
     }
 
