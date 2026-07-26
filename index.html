@@ -5,18 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ruta Segura</title>
 
+  <!-- META TAGS ANTI-CACHÉ (Obliga al celular a pedir la versión más reciente) -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-  <!-- Estilos propios (v=7.0 para forzar la actualización) -->
-  <link rel="stylesheet" href="styles.css?v=7.0">
+  <!-- Carga dinámica de styles.css (Rompe la caché en cada carga) -->
+  <script>
+    const styleLink = document.createElement('link');
+    styleLink.rel = 'stylesheet';
+    styleLink.href = 'styles.css?v=' + Date.now();
+    document.head.appendChild(styleLink);
+  </script>
 
   <!-- Manifest PWA -->
   <link rel="manifest" href="manifest.json">
+
+  <!-- Borrador automático de caché / Service Workers guardados -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+  </script>
 </head>
 <body>
 
-  <!-- Overlay para controles flotantes -->
+  <!-- Overlay para controles flotantes superior -->
   <div class="overlay top-bar">
     <div class="search-box">
       <!-- Input Origen -->
@@ -92,7 +113,11 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Script Principal (v=7.0) -->
-  <script src="app.js?v=7.0" defer></script>
+  <!-- Carga dinámica de app.js (Rompe la caché en cada carga) -->
+  <script>
+    const appScript = document.createElement('script');
+    appScript.src = 'app.js?v=' + Date.now();
+    document.body.appendChild(appScript);
+  </script>
 </body>
 </html>
