@@ -5,56 +5,39 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ruta Segura</title>
 
-  <!-- META TAGS ANTI-CACHÉ (Obliga al celular/navegador a pedir siempre la versión nueva) -->
+  <!-- Anti-Caché -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet CSS desde Cloudflare (Super estable) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
 
-  <!-- Carga dinámica de styles.css para romper la caché -->
+  <!-- CSS local con versión para romper caché -->
   <script>
     const styleLink = document.createElement('link');
     styleLink.rel = 'stylesheet';
     styleLink.href = 'styles.css?v=' + Date.now();
     document.head.appendChild(styleLink);
   </script>
-
-  <!-- Manifest PWA -->
-  <link rel="manifest" href="manifest.json">
-
-  <!-- Borrador automático de caché de Service Workers -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister();
-        }
-      });
-    }
-  </script>
 </head>
 <body>
 
-  <!-- Overlay superior (Buscadores) -->
+  <!-- Overlay Buscador -->
   <div class="overlay top-bar">
     <div class="search-box">
-      <!-- Input Origen -->
       <div class="input-row">
-        <button class="icon-btn" onclick="enableSetOriginMode()" title="Fijar en mapa">📍</button>
+        <button class="icon-btn" onclick="enableSetOriginMode()">📍</button>
         <input type="text" id="originInput" placeholder="Origen (ej. Córdoba Centro)" oninput="handleSearchInput(this.value, 'origin')">
         <button class="icon-btn" onclick="clearOrigin()">❌</button>
       </div>
 
-      <!-- Input Destino -->
       <div class="input-row">
-        <button class="icon-btn" title="Destino">🏁</button>
+        <button class="icon-btn">🏁</button>
         <input type="text" id="destInput" placeholder="¿A dónde vas?" oninput="handleSearchInput(this.value, 'dest')">
         <button class="icon-btn" onclick="clearDestination()">❌</button>
       </div>
 
-      <!-- Lista de sugerencias OSRM/Nominatim -->
       <div id="suggestions" class="suggestions-list"></div>
     </div>
 
@@ -63,57 +46,41 @@
     </div>
   </div>
 
-  <!-- Botones Flotantes (Alertas / Bocina / GPS) -->
+  <!-- Botones Flotantes -->
   <div class="floating-controls">
-    <!-- Menú Alertas -->
     <div class="bubble-group">
       <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
       <div id="alertOptions" class="menu-options">
         <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')">🕳️ Bache</div>
         <div class="menu-item" onclick="reportIncident('corte', '🚧 Calle cortada')">🚧 Calle cortada</div>
         <div class="menu-item" onclick="reportIncident('policia', '👮 Control policial')">👮 Control</div>
-        <div class="menu-item" onclick="reportIncident('peligro', '⚠️ Zona peligrosa')">⚠️ Peligro</div>
       </div>
     </div>
 
-    <!-- Menú Bocina / Avisos -->
-    <div class="bubble-group">
-      <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
-      <div id="hornOptions" class="menu-options">
-        <div class="menu-item" onclick="showToast('📢 Bocina activada')">📢 Bocina</div>
-        <div class="menu-item" onclick="showToast('🚨 Luces de emergencia')">🚨 Luces</div>
-      </div>
-    </div>
-
-    <!-- Re-centrar GPS -->
     <button class="fab-btn fab-gps" onclick="getUserLocation()">🎯</button>
   </div>
 
-  <!-- Panel Inferior de Navegación -->
+  <!-- Panel Inferior -->
   <div id="navPanel" class="overlay nav-panel" style="display:none;">
     <div class="nav-instruction">
-      <div class="street" id="navStreet">Ruta calculada</div>
+      <div class="street">Ruta calculada</div>
       <div class="distance" id="navDistance">0.0 km</div>
     </div>
-    
     <div style="display:flex; gap:8px;">
       <button id="btnStart" class="btn btn-success" style="flex:1;" onclick="startNavigation()">▶️ Iniciar</button>
       <button id="btnStop" class="btn btn-danger" style="flex:1; display:none;" onclick="stopNavigation()">⏹️ Detener</button>
-      <button id="btnDetour" class="btn btn-warning" style="display:none;" onclick="activateDetour()">🔀 Usar Atajo</button>
-      <button id="btnNextDetour" class="btn btn-primary" style="display:none;" onclick="cycleNextDetour()">➡️ Ot. Atajo</button>
     </div>
   </div>
 
-  <!-- Mensajes de Toast -->
   <div id="toast" class="toast"></div>
 
-  <!-- Contenedor del Mapa -->
+  <!-- DIV DEL MAPA -->
   <div id="map"></div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet JS desde Cloudflare -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 
-  <!-- Carga dinámica de app.js para romper la caché -->
+  <!-- JS local con versión -->
   <script>
     const appScript = document.createElement('script');
     appScript.src = 'app.js?v=' + Date.now();
