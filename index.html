@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  
+  <!-- CABECERAS ANTI-CACHÉ ESTRUCTURALES -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Ruta Segura - Atajos Dinámicos</title>
+  
+  <title>Ruta Segura - Ultra Rápida</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -205,6 +209,13 @@
   <div class="toast" id="toast"></div>
 
   <script>
+    // ELIMINACIÓN AUTOMÁTICA DE CACHÉ DE SERVICE WORKERS
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) { registration.unregister(); }
+      });
+    }
+
     const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
@@ -221,7 +232,7 @@
     let settingOriginMode = false;
     let activeInputTarget = 'dest';
 
-    const SAFETY_BUFFER_METERS = 100; // Radio mínimo a mantener lejos de cualquier obstáculo
+    const SAFETY_BUFFER_METERS = 100;
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -432,14 +443,13 @@
       popupContent.appendChild(deleteBtn);
       incidentMarker.bindPopup(popupContent);
 
-      // Al mover cualquier obstáculo, recalcula la ruta y limpia los atajos que toquen el nuevo punto
       incidentMarker.on('dragend', function(event) {
         const newPos = event.target.getLatLng();
         incidentObj.pos = [newPos.lat, newPos.lng];
         recalculateSmartRoute();
       });
 
-      showToast(`¡${label} agregado! Reevaluando trazas...`);
+      showToast(`¡${label} agregado! Reevaluando...`);
       recalculateSmartRoute();
     }
 
@@ -469,7 +479,6 @@
       recalculateSmartRoute();
     }
 
-    // Verifica que la ruta NO toque NINGÚN obstáculo activo
     function isRouteSafe(coords) {
       if (activeIncidents.length === 0) return true;
       return coords.every(coord => {
@@ -479,6 +488,7 @@
       });
     }
 
+    // ALGORITMO PARALELO ASÍNCRONO DE ALTA VELOCIDAD
     async function recalculateSmartRoute() {
       if (!userPos || !destPos) return;
 
@@ -489,7 +499,6 @@
       drawRoute(currentRoute.coords, '#3b82f6', false);
       updateNavInfo(currentRoute);
 
-      // Si no hay incidentes o la ruta original azul está limpia
       if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
         if (detourLayer) map.removeLayer(detourLayer);
         document.getElementById('btnDetour').style.display = 'none';
@@ -498,9 +507,9 @@
         return;
       }
 
-      // Si hay conflicto, buscamos MÚLTIPLES opciones de atajos limpios
-      let validCandidates = [];
-      const offsets = [0.001, -0.001, 0.0018, -0.0018, 0.0028, -0.0028, 0.004, -0.004];
+      // Pre-generamos waypoints concéntricos inmediatos
+      const offsets = [0.0012, -0.0012, 0.0022, -0.0022];
+      let promises = [];
 
       for (let incident of activeIncidents) {
         const cLat = incident.pos[0];
@@ -509,23 +518,29 @@
         for (let latOff of offsets) {
           for (let lngOff of offsets) {
             const bypass = [cLat + latOff, cLng + lngOff];
-            
-            const testRoutes = await fetchOSRM([userPos, bypass, destPos]);
-            for (let tRoute of testRoutes) {
-              // Condición estricta: debe esquivar TODOS los obstáculos cargados
-              if (isRouteSafe(tRoute.coords)) {
-                // Evitamos duplicados casi idénticos
-                if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 20)) {
-                  validCandidates.push(tRoute);
-                }
-              }
+            // Solo probamos waypoints que estén libres
+            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
+              promises.push(fetchOSRM([userPos, bypass, destPos]));
             }
           }
         }
       }
 
+      // EJECUCIÓN PARALELA DE PETICIONES (MULTITHREAD)
+      const resultsArray = await Promise.all(promises);
+      let validCandidates = [];
+
+      resultsArray.forEach(routes => {
+        routes.forEach(tRoute => {
+          if (isRouteSafe(tRoute.coords)) {
+            if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 25)) {
+              validCandidates.push(tRoute);
+            }
+          }
+        });
+      });
+
       if (validCandidates.length > 0) {
-        // Ordenamos por distancia para ofrecer primero la más corta
         validCandidates.sort((a, b) => a.distance - b.distance);
         availableDetours = validCandidates;
         currentDetourIndex = 0;
@@ -533,20 +548,19 @@
         renderCurrentDetour();
         document.getElementById('btnDetour').style.display = 'block';
         
-        // Muestra el botón extra si hay más de 1 alternativa limpia disponible
         if (availableDetours.length > 1) {
           document.getElementById('btnNextDetour').style.display = 'block';
         } else {
           document.getElementById('btnNextDetour').style.display = 'none';
         }
 
-        showToast(`⚡ ${availableDetours.length} atajo(s) seguro(s) hallado(s)`);
+        showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s) al instante`);
       } else {
         if (detourLayer) map.removeLayer(detourLayer);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
-        showToast('⚠️ Todos los desvíos cercanos tienen controles u obstáculos');
+        showToast('⚠️ No se hallaron desvíos libres cerca');
       }
     }
 
@@ -560,7 +574,7 @@
       if (availableDetours.length <= 1) return;
       currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
       renderCurrentDetour();
-      showToast(`🔀 Viendo Opción de Atajo ${currentDetourIndex + 1} de ${availableDetours.length}`);
+      showToast(`🔀 Atajo ${currentDetourIndex + 1} de ${availableDetours.length}`);
     }
 
     function getDistanceMeters(p1, p2) {
