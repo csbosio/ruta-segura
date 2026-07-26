@@ -2,92 +2,97 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  
-  <!-- Encabezados para deshabilitar cache del HTML -->
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Ruta Segura</title>
-  
-  <!-- Leaflet CDN -->
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
-  <!-- TUS ARCHIVOS CON VERSIONADO (Cache Busting) -->
-  <link rel="stylesheet" href="styles.css?v=1.0.0">
+
+  <!-- Estilos propios (versión 3.0 para romper el caché del celu) -->
+  <link rel="stylesheet" href="styles.css?v=3.0">
+
+  <!-- Manifest PWA -->
+  <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <div id="map"></div>
 
-  <!-- Barra Superior -->
-  <div class="top-bar overlay">
+  <!-- Overlay para controles flotantes -->
+  <div class="overlay top-bar">
     <div class="search-box">
+      <!-- Input Origen -->
       <div class="input-row">
-        <button class="icon-btn" onclick="getUserLocation()" title="Usar GPS actual">📍</button>
-        <input type="text" id="originInput" placeholder="Origen: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
-        <button class="icon-btn" onclick="clearOrigin()" title="Borrar Origen">❌</button>
-      </div>
-      
-      <div class="input-row">
-        <span style="font-size:14px; padding:0 6px;">🏁</span>
-        <input type="text" id="destInput" placeholder="Destino: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
-        <button class="icon-btn" onclick="clearDestination()" title="Borrar Destino">❌</button>
+        <button class="icon-btn" onclick="enableSetOriginMode()" title="Fijar en mapa">📍</button>
+        <input type="text" id="originInput" placeholder="Origen (ej. Córdoba Centro)" oninput="handleSearchInput(this.value, 'origin')">
+        <button class="icon-btn" onclick="clearOrigin()">❌</button>
       </div>
 
+      <!-- Input Destino -->
+      <div class="input-row">
+        <button class="icon-btn" title="Destino">🏁</button>
+        <input type="text" id="destInput" placeholder="¿A dónde vas?" oninput="handleSearchInput(this.value, 'dest')">
+        <button class="icon-btn" onclick="clearDestination()">❌</button>
+      </div>
+
+      <!-- Lista de sugerencias OSRM/Nominatim -->
       <div id="suggestions" class="suggestions-list"></div>
     </div>
 
     <div class="action-btns">
-      <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
+      <button class="btn btn-primary" onclick="calculateRoute()">Ir</button>
     </div>
   </div>
 
-  <!-- BURBUJAS FLOTANTES -->
-  <div class="floating-controls overlay">
-    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Marcar punto de origen en el mapa">🚗</button>
-
+  <!-- Botones Flotantes (Bocina / Alertas / GPS) -->
+  <div class="floating-controls">
+    <!-- Menú Alertas -->
     <div class="bubble-group">
-      <div class="menu-options" id="hornOptions">
-        <div class="menu-item" onclick="reportIncident('control_municipal', '🏛️ Control Municipal')"><span>🏛️</span> Control Municipal</div>
-        <div class="menu-item" onclick="reportIncident('itv', '🔍 ITV')"><span>🔍</span> ITV</div>
-        <div class="menu-item" onclick="reportIncident('radar', '📷 Radar')"><span>📷</span> Radar</div>
-        <div class="menu-item" onclick="reportIncident('control_transito', '🚘 Control de Tránsito')"><span>🚘</span> Control de Tránsito</div>
-        <div class="menu-item" onclick="reportIncident('control_transporte', '🚌 Control Transporte')"><span>🚌</span> Control Transporte</div>
-        <div class="menu-item" onclick="reportIncident('control_policial', '🚨 Control Policial')"><span>🚨</span> Control Policial</div>
-      </div>
-      <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
-    </div>
-
-    <div class="bubble-group">
-      <div class="menu-options" id="alertOptions">
-        <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')"><span>🕳️</span> Bache</div>
-        <div class="menu-item" onclick="reportIncident('manifestacion', '🪧 Manifestación')"><span>🪧</span> Manifestación</div>
-        <div class="menu-item" onclick="reportIncident('corte', '🚧 Corte de Calle')"><span>🚧</span> Corte de Calle</div>
-      </div>
       <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
+      <div id="alertOptions" class="menu-options">
+        <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')">🕳️ Bache</div>
+        <div class="menu-item" onclick="reportIncident('corte', '🚧 Calle cortada')">🚧 Calle cortada</div>
+        <div class="menu-item" onclick="reportIncident('policia', '👮 Control policial')">👮 Control</div>
+        <div class="menu-item" onclick="reportIncident('peligro', '⚠️ Zona peligrosa')">⚠️ Peligro</div>
+      </div>
     </div>
+
+    <!-- Menú Bocina / Avisos -->
+    <div class="bubble-group">
+      <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
+      <div id="hornOptions" class="menu-options">
+        <div class="menu-item" onclick="showToast('📢 Bocina activada')">📢 Bocina</div>
+        <div class="menu-item" onclick="showToast('🚨 Luces de emergencia')">🚨 Luces</div>
+      </div>
+    </div>
+
+    <!-- Re-centrar GPS -->
+    <button class="fab-btn fab-gps" onclick="getUserLocation()">🎯</button>
   </div>
 
-  <!-- Panel Navegación Inferior -->
-  <div class="nav-panel overlay" id="navPanel" style="display:none;">
+  <!-- Panel Inferior de Navegación -->
+  <div id="navPanel" class="overlay nav-panel" style="display:none;">
     <div class="nav-instruction">
-      <div class="distance" id="navDistance">--</div>
-      <div class="street" id="navStreet">Ruta Lista</div>
-      <div class="detail" id="navDetail" style="color:#94a3b8; font-size:14px;">Tocá "Iniciar viaje" para comenzar</div>
+      <div class="street" id="navStreet">Ruta calculada</div>
+      <div class="distance" id="navDistance">0.0 km</div>
     </div>
+    
     <div style="display:flex; gap:8px;">
-      <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
-      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío Seguro</button>
-      <button class="btn btn-primary" id="btnNextDetour" style="display:none; flex:0.6;" onclick="cycleNextDetour()">🔀 Otro Atajo</button>
-      <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Finalizar</button>
+      <button id="btnStart" class="btn btn-success" style="flex:1;" onclick="startNavigation()">▶️ Iniciar</button>
+      <button id="btnStop" class="btn btn-danger" style="flex:1; display:none;" onclick="stopNavigation()">⏹️ Detener</button>
+      <button id="btnDetour" class="btn btn-warning" style="display:none;" onclick="activateDetour()">🔀 Usar Atajo</button>
+      <button id="btnNextDetour" class="btn btn-primary" style="display:none;" onclick="cycleNextDetour()">➡️ Ot. Atajo</button>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <!-- Mensajes de Toast -->
+  <div id="toast" class="toast"></div>
 
-  <!-- JS CON VERSIONADO (Cache Busting) -->
-  <script src="app.js?v=1.0.0"></script>
+  <!-- Contenedor del Mapa -->
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Script Principal Completo (versión 3.0) -->
+  <script src="app.js?v=3.0" defer></script>
 </body>
 </html>
