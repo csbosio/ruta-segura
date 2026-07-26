@@ -1,4 +1,4 @@
-// Desregistro automático de Service Workers antiguos para forzar actualización
+// Desregistro automático de Service Workers antiguos
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(registrations => {
     for (let registration of registrations) { registration.unregister(); }
@@ -31,8 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function initMap() {
   map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
 
-  // MAPA FUTURISTA EN MODO OSCURO (CartoDB Dark Matter)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // MAPA OSCURO DE ALTO CONTRASTE (Las calles se ven blancas/claras y las avenidas naranjas/neón)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
     subdomains: 'abcd',
     attribution: '&copy; OpenStreetMap &copy; CARTO'
@@ -76,8 +76,8 @@ function updateUserMarker() {
     userMarker = L.marker(userPos, {
       icon: L.divIcon({
         className: 'custom-icon-marker',
-        html: '<div style="width:24px;height:24px;background:#00f2fe;border-radius:50%;border:3px solid #fff;box-shadow:0 0 15px #00f2fe;"></div>',
-        iconSize: [24, 24], iconAnchor: [12, 12]
+        html: '<div style="width:28px;height:28px;background:#00f2fe;border-radius:50%;border:3px solid #000;box-shadow:0 0 15px #00f2fe;"></div>',
+        iconSize: [28, 28], iconAnchor: [14, 14]
       })
     }).addTo(map);
   } else {
@@ -112,9 +112,9 @@ async function setDestinationFromMap(latlng) {
   destMarker = L.marker(destPos, {
     icon: L.divIcon({
       className: 'custom-icon-marker',
-      html: '<div style="font-size:36px; filter: drop-shadow(0 0 8px #00f2fe);">🏁</div>',
-      iconSize: [40, 40],
-      iconAnchor: [20, 40]
+      html: '<div style="font-size:40px; filter: drop-shadow(0 0 10px #000);">🏁</div>',
+      iconSize: [44, 44],
+      iconAnchor: [22, 44]
     })
   }).addTo(map);
 
@@ -164,9 +164,9 @@ function handleSearchInput(query, target) {
               destMarker = L.marker(destPos, {
                 icon: L.divIcon({
                   className: 'custom-icon-marker',
-                  html: '<div style="font-size:36px; filter: drop-shadow(0 0 8px #00f2fe);">🏁</div>',
-                  iconSize: [40, 40],
-                  iconAnchor: [20, 40]
+                  html: '<div style="font-size:40px; filter: drop-shadow(0 0 10px #000);">🏁</div>',
+                  iconSize: [44, 44],
+                  iconAnchor: [22, 44]
                 })
               }).addTo(map);
             }
@@ -217,7 +217,6 @@ function closeAllMenus() {
   document.getElementById('alertOptions').classList.remove('active');
 }
 
-// REPORTAR INCIDENTE CON ÍCONOS MÁS GRANDES Y SIN MARCO NEGRO
 function reportIncident(type, label) {
   closeAllMenus();
   const centerPos = map.getCenter();
@@ -304,7 +303,7 @@ async function recalculateSmartRoute() {
   if (directRoutes.length === 0) return;
 
   currentRoute = directRoutes[0];
-  drawRoute(currentRoute.coords, '#00f2fe', false); // Color Neón Cían para la ruta principal
+  drawRoute(currentRoute.coords, '#0055ff', false);
   updateNavInfo(currentRoute);
 
   if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
@@ -372,7 +371,7 @@ async function recalculateSmartRoute() {
 function renderCurrentDetour() {
   if (availableDetours.length === 0) return;
   detourRoute = availableDetours[currentDetourIndex];
-  drawRoute(detourRoute.coords, '#ff007f', true); // Color Neón Magenta para los desvíos
+  drawRoute(detourRoute.coords, '#ff0055', true);
 }
 
 function cycleNextDetour() {
@@ -396,7 +395,7 @@ function drawRoute(coords, color, isDetour) {
   if (isDetour && detourLayer) map.removeLayer(detourLayer);
   if (!isDetour && routeLayer) map.removeLayer(routeLayer);
 
-  const layer = L.polyline(coords, { color: color, weight: isDetour ? 6 : 7, opacity: 0.9 }).addTo(map);
+  const layer = L.polyline(coords, { color: color, weight: isDetour ? 7 : 8, opacity: 0.95 }).addTo(map);
 
   if (isDetour) detourLayer = layer;
   else routeLayer = layer;
@@ -411,7 +410,7 @@ function updateNavInfo(routeData) {
 
 function activateDetour() {
   if (!detourRoute) return;
-  drawRoute(detourRoute.coords, '#00f2fe', false);
+  drawRoute(detourRoute.coords, '#0055ff', false);
   if (detourLayer) map.removeLayer(detourLayer);
   currentRoute = detourRoute;
   document.getElementById('btnDetour').style.display = 'none';
