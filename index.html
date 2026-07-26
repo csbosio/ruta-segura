@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Ruta Segura v4 - Atajo Inteligente</title>
+  <title>Ruta Segura v8 - Multi-Obstáculos</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -30,12 +30,24 @@
       background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 70%, transparent 100%);
       display: flex; gap: 8px; align-items: flex-start;
     }
-    .search-box { flex: 1; display: flex; flex-direction: column; gap: 6px; position: relative; }
-    .search-box input {
-      width: 100%; padding: 12px 14px; border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.2); background: rgba(30,41,59,0.95);
-      color: #fff; font-size: 14px; outline: none;
+    .search-box { flex: 1; display: flex; flex-direction: column; gap: 8px; position: relative; }
+    
+    .input-row {
+      display: flex; align-items: center; background: rgba(30,41,59,0.95);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 2px 8px;
     }
+    .input-row:focus-within { border-color: #3b82f6; }
+    
+    .input-row input {
+      flex: 1; padding: 10px 6px; border: none; background: transparent;
+      color: #fff; font-size: 14px; outline: none; width: 100%;
+    }
+    
+    .icon-btn {
+      background: none; border: none; color: #94a3b8; font-size: 15px;
+      cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn:active { color: #fff; transform: scale(1.1); }
 
     .suggestions-list {
       position: absolute; top: 100%; left: 0; right: 0;
@@ -49,11 +61,11 @@
     }
     .suggestion-item:hover { background: #334155; color: #3b82f6; }
     
-    .action-btns { display: flex; gap: 6px; }
+    .action-btns { display: flex; align-self: center; }
     .btn {
-      padding: 12px 14px; border-radius: 12px; border: none; font-size: 14px;
-      font-weight: 600; cursor: pointer; white-space: nowrap; display: flex;
-      align-items: center; justify-content: center;
+      padding: 12px 16px; border-radius: 12px; border: none; font-size: 15px;
+      font-weight: 700; cursor: pointer; white-space: nowrap; display: flex;
+      align-items: center; justify-content: center; height: 100%;
     }
     .btn-primary { background: #3b82f6; color: #fff; }
     .btn-danger { background: #ef4444; color: #fff; }
@@ -62,18 +74,19 @@
 
     /* CONTENEDOR DE BURBUJAS DERECHA */
     .floating-controls {
-      position: absolute; right: 16px; top: 15%;
-      display: flex; flex-direction: column; gap: 16px;
+      position: absolute; right: 16px; top: 22%;
+      display: flex; flex-direction: column; gap: 14px;
       align-items: flex-end; z-index: 1500;
     }
 
     .bubble-group { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 
     .fab-btn {
-      width: 56px; height: 56px; border-radius: 50%; font-size: 24px;
+      width: 52px; height: 52px; border-radius: 50%; font-size: 22px;
       display: flex; align-items: center; justify-content: center;
       border: 2px solid #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
     }
+    .fab-gps { background: #10b981; color: #fff; }
     .fab-horn { background: #2563eb; color: #fff; }
     .fab-alert { background: #f59e0b; color: #000; }
 
@@ -124,19 +137,32 @@
   <!-- Barra Superior -->
   <div class="top-bar overlay">
     <div class="search-box">
-      <input type="text" id="originInput" placeholder="📍 Ubicación actual" readonly>
-      <input type="text" id="destInput" placeholder="🏁 Escribí o tocá el mapa..." oninput="handleSearchInput(this.value)">
+      <!-- Fila 1: Origen -->
+      <div class="input-row">
+        <button class="icon-btn" onclick="getUserLocation()" title="Usar GPS actual">📍</button>
+        <input type="text" id="originInput" placeholder="Origen: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
+        <button class="icon-btn" onclick="clearOrigin()" title="Borrar Origen">❌</button>
+      </div>
+      
+      <!-- Fila 2: Destino -->
+      <div class="input-row">
+        <span style="font-size:14px; padding:0 6px;">🏁</span>
+        <input type="text" id="destInput" placeholder="Destino: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
+        <button class="icon-btn" onclick="clearDestination()" title="Borrar Destino">❌</button>
+      </div>
+
       <div id="suggestions" class="suggestions-list"></div>
     </div>
+
     <div class="action-btns">
       <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
-      <button class="btn btn-danger" onclick="clearDestination()" title="Borrar Destino">❌</button>
     </div>
   </div>
 
   <!-- BURBUJAS FLOTANTES DERECHA -->
   <div class="floating-controls overlay">
-    
+    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Marcar punto de origen en el mapa">🚗</button>
+
     <!-- Burbuja 1: Bocina (Controles e Inspecciones) -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
@@ -159,14 +185,13 @@
       </div>
       <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
     </div>
-
   </div>
 
   <!-- Panel Navegación Inferior -->
   <div class="nav-panel overlay" id="navPanel" style="display:none;">
     <div class="nav-instruction">
       <div class="distance" id="navDistance">--</div>
-      <div class="street" id="navStreet">Ruta lista</div>
+      <div class="street" id="navStreet">Ruta Lista</div>
       <div class="detail" id="navDetail" style="color:#94a3b8; font-size:14px;">Tocá "Iniciar viaje" para comenzar</div>
     </div>
     <div style="display:flex; gap:8px;">
@@ -186,9 +211,13 @@
     let map, userPos = null, destPos = null;
     let currentRoute = null, detourRoute = null;
     let routeLayer = null, detourLayer = null;
-    let userMarker = null, destMarker = null, tempMarker = null;
+    let userMarker = null, destMarker = null;
     let activeIncidents = [];
     let debounceTimer = null;
+    let settingOriginMode = false;
+    let activeInputTarget = 'dest';
+
+    const SAFETY_BUFFER_METERS = 150; // Distancia mínima respetada frente a cualquier alerta
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
@@ -202,7 +231,13 @@
       map.on('click', function(e) {
         document.getElementById('suggestions').style.display = 'none';
         closeAllMenus();
-        setDestinationFromMap(e.latlng);
+        
+        if (settingOriginMode) {
+          setOriginFromMap(e.latlng);
+          settingOriginMode = false;
+        } else {
+          setDestinationFromMap(e.latlng);
+        }
       });
     }
 
@@ -211,50 +246,61 @@
       navigator.geolocation.getCurrentPosition(
         pos => {
           userPos = [pos.coords.latitude, pos.coords.longitude];
-          document.getElementById('originInput').value = '📍 Tu ubicación actual';
-          if (!userMarker) {
-            userMarker = L.marker(userPos, {
-              icon: L.divIcon({
-                html: '<div style="width:18px;height:18px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px #3b82f6;"></div>',
-                iconSize: [18, 18], iconAnchor: [9, 9]
-              })
-            }).addTo(map);
-          } else {
-            userMarker.setLatLng(userPos);
-          }
-          map.setView(userPos, 16);
+          document.getElementById('originInput').value = 'Mi ubicación actual';
+          updateUserMarker();
+          map.setView(userPos, 15);
+          showToast('📍 Ubicación detectada');
         },
         () => {
           userPos = DEFAULT_ORIGIN;
-          document.getElementById('originInput').value = '📍 Córdoba Centro';
+          document.getElementById('originInput').value = 'Córdoba Centro';
+          updateUserMarker();
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
 
-    function clearDestination() {
-      destPos = null; currentRoute = null; detourRoute = null;
-      document.getElementById('destInput').value = '';
-      document.getElementById('suggestions').style.display = 'none';
+    function updateUserMarker() {
+      if (!userPos) return;
+      if (!userMarker) {
+        userMarker = L.marker(userPos, {
+          icon: L.divIcon({
+            html: '<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px #3b82f6;"></div>',
+            iconSize: [20, 20], iconAnchor: [10, 10]
+          })
+        }).addTo(map);
+      } else {
+        userMarker.setLatLng(userPos);
+      }
+    }
 
-      if (destMarker) map.removeLayer(destMarker);
-      if (tempMarker) map.removeLayer(tempMarker);
-      if (routeLayer) map.removeLayer(routeLayer);
-      if (detourLayer) map.removeLayer(detourLayer);
+    function enableSetOriginMode() {
+      settingOriginMode = true;
+      showToast('👉 Tocá en el mapa para fijar tu ORIGEN (🚗)');
+    }
 
-      document.getElementById('navPanel').style.display = 'none';
-      showToast('Destino eliminado');
+    async function setOriginFromMap(latlng) {
+      userPos = [latlng.lat, latlng.lng];
+      updateUserMarker();
+      
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          document.getElementById('originInput').value = data.display_name.split(',')[0];
+        }
+      } catch(e){}
+
+      if (destPos) recalculateSmartRoute();
     }
 
     async function setDestinationFromMap(latlng) {
-      if (tempMarker) map.removeLayer(tempMarker);
       destPos = [latlng.lat, latlng.lng];
 
-      tempMarker = L.marker(destPos, {
+      if (destMarker) map.removeLayer(destMarker);
+      destMarker = L.marker(destPos, {
         icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
       }).addTo(map);
-
-      calculateRoute();
 
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
@@ -263,13 +309,18 @@
           document.getElementById('destInput').value = data.display_name.split(',')[0];
         }
       } catch(e){}
+
+      if (userPos) recalculateSmartRoute();
     }
 
-    function handleSearchInput(query) {
+    function handleSearchInput(query, target) {
+      activeInputTarget = target;
       clearTimeout(debounceTimer);
       const suggBox = document.getElementById('suggestions');
+      
       if (!query || query.trim().length < 2) {
-        suggBox.style.display = 'none'; return;
+        suggBox.style.display = 'none'; 
+        return;
       }
 
       debounceTimer = setTimeout(async () => {
@@ -284,10 +335,24 @@
               item.className = 'suggestion-item';
               item.textContent = place.display_name;
               item.onclick = () => {
-                document.getElementById('destInput').value = place.display_name.split(',')[0];
-                destPos = [parseFloat(place.lat), parseFloat(place.lon)];
+                const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
+                
+                if (activeInputTarget === 'origin') {
+                  userPos = latlng;
+                  document.getElementById('originInput').value = place.display_name.split(',')[0];
+                  updateUserMarker();
+                } else {
+                  destPos = latlng;
+                  document.getElementById('destInput').value = place.display_name.split(',')[0];
+                  if (destMarker) map.removeLayer(destMarker);
+                  destMarker = L.marker(destPos, {
+                    icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                  }).addTo(map);
+                }
+
                 suggBox.style.display = 'none';
-                calculateRoute();
+                map.setView(latlng, 15);
+                if (userPos && destPos) recalculateSmartRoute();
               };
               suggBox.appendChild(item);
             });
@@ -295,6 +360,28 @@
           }
         } catch (e) {}
       }, 250);
+    }
+
+    function clearOrigin() {
+      userPos = null;
+      document.getElementById('originInput').value = '';
+      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+      clearRoutes();
+      showToast('Origen eliminado');
+    }
+
+    function clearDestination() {
+      destPos = null;
+      document.getElementById('destInput').value = '';
+      if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+      clearRoutes();
+      showToast('Destino eliminado');
+    }
+
+    function clearRoutes() {
+      if (routeLayer) map.removeLayer(routeLayer);
+      if (detourLayer) map.removeLayer(detourLayer);
+      document.getElementById('navPanel').style.display = 'none';
     }
 
     function toggleMenu(menuId) {
@@ -347,7 +434,7 @@
         recalculateSmartRoute();
       });
 
-      showToast(`¡${label} marcado! Evitando zona...`);
+      showToast(`¡${label} agregado! Buscando desvíos...`);
       recalculateSmartRoute();
     }
 
@@ -368,18 +455,23 @@
       return [];
     }
 
-    async function calculateRoute() {
+    function calculateRoute() {
       document.getElementById('suggestions').style.display = 'none';
-      if (!userPos || !destPos) return;
-
-      if (destMarker) map.removeLayer(destMarker);
-      if (tempMarker) map.removeLayer(tempMarker);
-
-      destMarker = L.marker(destPos, {
-        icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
-      }).addTo(map);
-
+      if (!userPos || !destPos) {
+        showToast('⚠️ Definí Origen y Destino primero');
+        return;
+      }
       recalculateSmartRoute();
+    }
+
+    // Comprueba si una traza es 100% segura frente a TODOS los obstáculos cargados
+    function isRouteSafe(coords) {
+      if (activeIncidents.length === 0) return true;
+      return coords.every(coord => {
+        return activeIncidents.every(incident => {
+          return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
+        });
+      });
     }
 
     async function recalculateSmartRoute() {
@@ -392,46 +484,37 @@
       drawRoute(currentRoute.coords, '#3b82f6', false);
       updateNavInfo(currentRoute);
 
-      if (activeIncidents.length === 0) {
+      // Si no hay incidentes o la ruta original está completamente libre
+      if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
         if (detourLayer) map.removeLayer(detourLayer);
         document.getElementById('btnDetour').style.display = 'none';
         return;
       }
 
-      let passesNearIncident = false;
-      for (let incident of activeIncidents) {
-        if (currentRoute.coords.some(coord => getDistanceMeters(coord, incident.pos) < 180)) {
-          passesNearIncident = true;
-          break;
-        }
-      }
-
-      if (!passesNearIncident) {
-        if (detourLayer) map.removeLayer(detourLayer);
-        document.getElementById('btnDetour').style.display = 'none';
-        return;
-      }
-
+      // Si la ruta pasa cerca de AL MENOS UN obstáculo, calculamos desvíos
       let bestDetour = null;
       let minDistance = Infinity;
+
+      // Creamos waypoints de desvío con distancias progresivas (300m y 500m)
+      const offsets = [0.003, -0.003, 0.005, -0.005];
 
       for (let incident of activeIncidents) {
         const cLat = incident.pos[0];
         const cLng = incident.pos[1];
 
-        const smartBypasses = [
-          [cLat + 0.0018, cLng + 0.0018],
-          [cLat - 0.0018, cLng - 0.0018],
-          [cLat + 0.0018, cLng - 0.0018],
-          [cLat - 0.0018, cLng + 0.0018]
-        ];
+        let bypassCandidates = [];
+        for (let latOff of offsets) {
+          for (let lngOff of offsets) {
+            bypassCandidates.push([cLat + latOff, cLng + lngOff]);
+          }
+        }
 
-        for (let bypass of smartBypasses) {
+        // Probamos rutas compuestas que esquiven la zona afectada
+        for (let bypass of bypassCandidates) {
           const testRoutes = await fetchOSRM([userPos, bypass, destPos]);
           for (let tRoute of testRoutes) {
-            const isSafe = tRoute.coords.every(coord => getDistanceMeters(coord, incident.pos) > 120);
-
-            if (isSafe && tRoute.distance < minDistance) {
+            // Validación MULTI-OBSTÁCULO: la ruta no puede tocar NINGÚN incidente
+            if (isRouteSafe(tRoute.coords) && tRoute.distance < minDistance) {
               minDistance = tRoute.distance;
               bestDetour = tRoute;
             }
@@ -443,7 +526,11 @@
         detourRoute = bestDetour;
         drawRoute(detourRoute.coords, '#f59e0b', true);
         document.getElementById('btnDetour').style.display = 'block';
-        showToast('⚡ Atajo seguro calculado (evitando el control)');
+        showToast('⚡ Atajo seguro disponible (esquivando todos los cortes)');
+      } else {
+        if (detourLayer) map.removeLayer(detourLayer);
+        document.getElementById('btnDetour').style.display = 'none';
+        showToast('⚠️ Zona bloqueada: No se encontró ruta alternativa segura');
       }
     }
 
@@ -471,7 +558,7 @@
       document.getElementById('navPanel').style.display = 'flex';
       document.getElementById('btnStart').style.display = 'block';
       document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
-      document.getElementById('navStreet').textContent = 'Ruta Directa Lista';
+      document.getElementById('navStreet').textContent = 'Ruta Lista';
     }
 
     function activateDetour() {
