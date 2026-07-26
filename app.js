@@ -23,16 +23,23 @@ document.addEventListener('DOMContentLoaded', () => {
   getUserLocation();
 });
 
-// Inicializar Mapa con Capa Oscura + Filtro CSS
+// Inicializar Mapa
 function initMap() {
-  map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
+  map = L.map('map', { 
+    zoomControl: false,
+    attributionControl: false
+  }).setView(DEFAULT_ORIGIN, 14);
 
   // Capa base Carto DarkMatter
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
-    subdomains: 'abcd',
-    attribution: '&copy; OpenStreetMap &copy; CARTO'
+    subdomains: 'abcd'
   }).addTo(map);
+
+  // Fuerza el redibujado inmediato del mapa para evitar pantallazos negros
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 200);
 
   map.on('click', function(e) {
     document.getElementById('suggestions').style.display = 'none';
