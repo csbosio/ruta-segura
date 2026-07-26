@@ -6,32 +6,28 @@
 }
 
 body, html {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background-color: #0d131f;
 }
 
 /* =========================================
-   CONTENEDOR DEL MAPA Y FILTRO PUNK
+   CONTENEDOR DEL MAPA Y FILTRO PUNK DEFINITIVO
    ========================================= */
 #map {
-  width: 100vw;
-  height: 100vh;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 1;
-  background: #0d131f !important; /* Azul marino oscuro profundo */
+  background-color: #0d131f !important;
 }
 
-/* Filtro Punk Corregido: Mapa en Azul Marino con calles resaltadas en Amarillo Neón */
+/* Invierte OpenStreetMap estándar: el fondo blanco se vuelve azul marino oscuro y las calles destacan en amarillo neón */
 #map .leaflet-tile-pane {
-  filter: sepia(100%) saturate(600%) hue-rotate(340deg) brightness(1.1) contrast(1.3);
-}
-
-.leaflet-tile {
-  visibility: visible !important;
+  filter: invert(100%) hue-rotate(180deg) brightness(0.95) contrast(1.4) saturate(1.8);
 }
 
 /* =========================================
