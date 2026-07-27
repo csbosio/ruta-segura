@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   
-  <title>Ruta Segura - HUD Cyberpunk con Voz</title>
+  <title>Ruta Segura - HUD Cyberpunk con Selección de Borrado</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -103,14 +103,14 @@
 
     /* Controles Flotantes */
     .floating-controls {
-      position: absolute; right: 16px; top: 20%;
-      display: flex; flex-direction: column; gap: 14px;
+      position: absolute; right: 16px; top: 18%;
+      display: flex; flex-direction: column; gap: 12px;
       align-items: flex-end; z-index: 1500;
     }
     .bubble-group { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 
     .fab-btn {
-      width: 54px; height: 54px; border-radius: 50%; font-size: 24px;
+      width: 52px; height: 52px; border-radius: 50%; font-size: 22px;
       display: flex; align-items: center; justify-content: center;
       border: 2px solid #00f3ff; cursor: pointer; 
       background: rgba(8, 12, 24, 0.88); backdrop-filter: blur(10px);
@@ -119,6 +119,7 @@
     .fab-gps { border-color: #00ff66; box-shadow: 0 0 20px rgba(0, 255, 102, 0.5); }
     .fab-theme { border-color: #ff00ff; box-shadow: 0 0 20px rgba(255, 0, 255, 0.5); }
     .fab-voice { border-color: #ffb700; box-shadow: 0 0 20px rgba(255, 183, 0, 0.5); }
+    .fab-clear { border-color: #ff3300; box-shadow: 0 0 20px rgba(255, 51, 0, 0.6); }
     .fab-horn { border-color: #00f3ff; box-shadow: 0 0 20px rgba(0, 243, 255, 0.5); }
     .fab-alert { border-color: #ff0055; box-shadow: 0 0 20px rgba(255, 0, 85, 0.5); }
 
@@ -130,6 +131,7 @@
       background: rgba(8, 12, 24, 0.95); padding: 10px 16px; border-radius: 20px;
       border: 1px solid rgba(0, 243, 255, 0.5); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
     }
+    .menu-item-danger { border-color: rgba(255, 51, 0, 0.8); }
 
     .draggable-marker {
       font-size: 26px; background: rgba(8, 12, 24, 0.9); padding: 6px;
@@ -185,6 +187,16 @@
     <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen">🚗</button>
     <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Modo Oscuro">🌙</button>
     <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
+
+    <!-- MENÚ DE LIMPIEZA / BORRADO -->
+    <div class="bubble-group">
+      <div class="menu-options" id="clearOptions">
+        <div class="menu-item" onclick="clearRouteOnly()"><span>🗺️</span> Eliminar Recorrido</div>
+        <div class="menu-item" onclick="clearIncidentsOnly()"><span>🚨</span> Eliminar Controles</div>
+        <div class="menu-item menu-item-danger" onclick="clearEverything()"><span>💥</span> Eliminar Todo</div>
+      </div>
+      <button class="fab-btn fab-clear" onclick="toggleMenu('clearOptions')" title="Limpiar Mapa">🗑️</button>
+    </div>
 
     <!-- Inspecciones -->
     <div class="bubble-group">
@@ -245,7 +257,6 @@
       getUserLocation();
     });
 
-    // MÓDULO DE VOZ
     function speak(text) {
       if (!isVoiceActive || !('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
@@ -305,6 +316,36 @@
         btn.textContent = '🌙';
         showToast('Modo Claro Activado', true);
       }
+    }
+
+    /* FUNCIONES DE LIMPIEZA SELECCIONABLE */
+    function clearRouteOnly() {
+      closeAllMenus();
+      userPos = null;
+      destPos = null;
+      document.getElementById('originInput').value = '';
+      document.getElementById('destInput').value = '';
+      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
+      if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
+      clearRoutes();
+      showToast('Recorrido eliminado', true);
+    }
+
+    function clearIncidentsOnly() {
+      closeAllMenus();
+      activeIncidents.forEach(inc => map.removeLayer(inc.marker));
+      activeIncidents = [];
+      if (detourLayerGroup) map.removeLayer(detourLayerGroup);
+      document.getElementById('btnDetour').style.display = 'none';
+      document.getElementById('btnNextDetour').style.display = 'none';
+      showToast('Todos los controles eliminados', true);
+      if (userPos && destPos) recalculateSmartRoute();
+    }
+
+    function clearEverything() {
+      clearRouteOnly();
+      clearIncidentsOnly();
+      showToast('Todo fue eliminado del mapa', true);
     }
 
     function getUserLocation() {
@@ -443,6 +484,7 @@
     }
 
     function closeAllMenus() {
+      document.getElementById('clearOptions').classList.remove('active');
       document.getElementById('hornOptions').classList.remove('active');
       document.getElementById('alertOptions').classList.remove('active');
     }
