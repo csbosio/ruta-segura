@@ -4,14 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   
-  <!-- CABECERAS ANTI-CACHÉ -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   
-  <title>Ruta Segura - HUD Cyberpunk</title>
+  <title>Ruta Segura - HUD Cyberpunk con Voz</title>
   
-  <!-- FUENTE FUTURISTA -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -21,7 +19,6 @@
   
   <style>
     :root {
-      /* Filtro por defecto: Mapa Blanco/Claro limpio */
       --tile-filter: grayscale(100%) brightness(1.05);
     }
 
@@ -36,15 +33,12 @@
     }
     #map { 
       position: absolute; 
-      top: 0; 
-      left: 0; 
-      width: 100%; 
-      height: 100%; 
+      top: 0; left: 0; 
+      width: 100%; height: 100%; 
       z-index: 1; 
       background: #ffffff;
     }
 
-    /* FILTRO APLICADO A LAS CALLES DEL MAPA */
     .leaflet-tile {
       filter: var(--tile-filter);
       transition: filter 0.4s ease;
@@ -53,7 +47,7 @@
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
     .overlay > * { pointer-events: auto; }
 
-    /* Barra Superior - HUD Style */
+    /* Barra Superior */
     .top-bar {
       top: 0; left: 0; right: 0;
       padding: 14px 16px;
@@ -69,13 +63,7 @@
       border-radius: 12px; padding: 2px 8px;
       box-shadow: 0 0 15px rgba(0, 243, 255, 0.2), inset 0 0 10px rgba(0, 243, 255, 0.05);
       backdrop-filter: blur(12px);
-      transition: all 0.3s ease;
     }
-    .input-row:focus-within { 
-      border-color: #00f3ff; 
-      box-shadow: 0 0 20px rgba(0, 243, 255, 0.6), inset 0 0 12px rgba(0, 243, 255, 0.2); 
-    }
-    
     .input-row input {
       flex: 1; padding: 10px 6px; border: none; background: transparent;
       color: #ffffff; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; outline: none; width: 100%;
@@ -87,7 +75,6 @@
       cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center;
       text-shadow: 0 0 8px #00f3ff;
     }
-    .icon-btn:active { transform: scale(1.2); }
 
     .suggestions-list {
       position: absolute; top: 100%; left: 0; right: 0;
@@ -100,36 +87,26 @@
     }
     .suggestion-item {
       padding: 12px 14px; font-size: 14px; color: #ffffff; cursor: pointer;
-      border-bottom: 1px solid rgba(0, 243, 255, 0.15);
-      font-weight: 600;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15); font-weight: 600;
     }
-    .suggestion-item:hover { background: rgba(0, 243, 255, 0.25); color: #00f3ff; }
-    
-    .action-btns { display: flex; align-self: stroke; }
+
     .btn {
       padding: 12px 18px; border-radius: 12px; border: none; font-size: 16px;
       font-family: 'Rajdhani', sans-serif; font-weight: 800; cursor: pointer; white-space: nowrap; 
       display: flex; align-items: center; justify-content: center; height: 100%;
       text-transform: uppercase; letter-spacing: 1px;
-      transition: all 0.2s ease;
     }
-    .btn-primary { 
-      background: #00f3ff; color: #02040a; 
-      box-shadow: 0 0 20px rgba(0, 243, 255, 0.6); 
-    }
-    .btn-primary:active { transform: scale(0.95); box-shadow: 0 0 30px rgba(0, 243, 255, 0.9); }
-    
+    .btn-primary { background: #00f3ff; color: #02040a; box-shadow: 0 0 20px rgba(0, 243, 255, 0.6); }
     .btn-danger { background: #ff0055; color: #fff; box-shadow: 0 0 20px rgba(255, 0, 85, 0.6); }
     .btn-warning { background: #ffb700; color: #000; box-shadow: 0 0 20px rgba(255, 183, 0, 0.6); }
     .btn-success { background: #00ff66; color: #02040a; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
 
-    /* CONTENEDOR DE BURBUJAS FLOTANTES */
+    /* Controles Flotantes */
     .floating-controls {
       position: absolute; right: 16px; top: 20%;
       display: flex; flex-direction: column; gap: 14px;
       align-items: flex-end; z-index: 1500;
     }
-
     .bubble-group { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 
     .fab-btn {
@@ -138,75 +115,44 @@
       border: 2px solid #00f3ff; cursor: pointer; 
       background: rgba(8, 12, 24, 0.88); backdrop-filter: blur(10px);
       box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
-      transition: all 0.2s ease;
     }
-    .fab-btn:active { transform: scale(1.1); }
     .fab-gps { border-color: #00ff66; box-shadow: 0 0 20px rgba(0, 255, 102, 0.5); }
     .fab-theme { border-color: #ff00ff; box-shadow: 0 0 20px rgba(255, 0, 255, 0.5); }
+    .fab-voice { border-color: #ffb700; box-shadow: 0 0 20px rgba(255, 183, 0, 0.5); }
     .fab-horn { border-color: #00f3ff; box-shadow: 0 0 20px rgba(0, 243, 255, 0.5); }
     .fab-alert { border-color: #ff0055; box-shadow: 0 0 20px rgba(255, 0, 85, 0.5); }
 
-    .menu-options {
-      display: none; flex-direction: column; gap: 8px; align-items: flex-end;
-    }
+    .menu-options { display: none; flex-direction: column; gap: 8px; align-items: flex-end; }
     .menu-options.active { display: flex; }
 
     .menu-item {
       display: flex; align-items: center; gap: 10px;
       background: rgba(8, 12, 24, 0.95); padding: 10px 16px; border-radius: 20px;
-      border: 1px solid rgba(0, 243, 255, 0.5); color: #fff; font-size: 14px;
-      font-weight: 700; cursor: pointer; white-space: nowrap;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.25);
-      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 243, 255, 0.5); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
     }
-    .menu-item:active { background: rgba(0, 243, 255, 0.35); }
 
     .draggable-marker {
       font-size: 26px; background: rgba(8, 12, 24, 0.9); padding: 6px;
-      border-radius: 50%; border: 2px solid #ff0055; text-align: center; cursor: grab;
-      box-shadow: 0 0 20px #ff0055;
+      border-radius: 50%; border: 2px solid #ff0055; text-align: center;
     }
 
-    /* Popups estilo Cyberpunk */
-    .leaflet-popup-content-wrapper { 
-      background: rgba(8, 12, 24, 0.95) !important; 
-      color: #00f3ff !important; 
-      border-radius: 12px !important; 
-      border: 1px solid #00f3ff !important;
-      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4) !important;
-      font-family: 'Rajdhani', sans-serif !important;
-    }
-    .leaflet-popup-tip { background: #00f3ff !important; }
-    .popup-delete-btn { 
-      background: #ff0055; color: #fff; border: none; padding: 8px 12px; 
-      border-radius: 8px; width: 100%; margin-top: 6px; cursor: pointer; 
-      font-family: 'Rajdhani', sans-serif; font-weight: 800;
-      box-shadow: 0 0 12px rgba(255, 0, 85, 0.5);
-    }
-
-    /* Panel Inferior HUD */
     .nav-panel {
       bottom: 0; left: 0; right: 0; padding: 0 16px 20px;
       background: linear-gradient(0deg, rgba(2, 4, 10, 0.98) 0%, rgba(2, 4, 10, 0.7) 70%, transparent 100%);
       display: flex; flex-direction: column; gap: 12px;
     }
     .nav-instruction { 
-      background: rgba(8, 12, 24, 0.9); 
-      border-radius: 16px; padding: 18px; 
-      border: 1px solid rgba(0, 243, 255, 0.4); 
-      box-shadow: 0 0 25px rgba(0, 243, 255, 0.2);
-      backdrop-filter: blur(16px);
+      background: rgba(8, 12, 24, 0.9); border-radius: 16px; padding: 18px; 
+      border: 1px solid rgba(0, 243, 255, 0.4); backdrop-filter: blur(16px);
     }
-    .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.6); }
-    .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; text-shadow: 0 0 15px #00f3ff; }
+    .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; }
+    .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; }
 
     .toast {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       background: rgba(8, 12, 24, 0.95); color: #00f3ff; padding: 14px 24px;
       border-radius: 12px; font-size: 16px; font-weight: 700; z-index: 3000; display: none;
       border: 1px solid #00f3ff; text-align: center;
-      box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
-      backdrop-filter: blur(16px);
     }
     .toast.show { display: block; }
   </style>
@@ -217,45 +163,37 @@
   <!-- Barra Superior HUD -->
   <div class="top-bar overlay">
     <div class="search-box">
-      <!-- Fila 1: Origen -->
       <div class="input-row">
-        <button class="icon-btn" onclick="getUserLocation()" title="Usar GPS actual">📍</button>
+        <button class="icon-btn" onclick="getUserLocation()" title="GPS">📍</button>
         <input type="text" id="originInput" placeholder="ORIGEN: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
-        <button class="icon-btn" onclick="clearOrigin()" title="Borrar Origen">❌</button>
+        <button class="icon-btn" onclick="clearOrigin()">❌</button>
       </div>
-      
-      <!-- Fila 2: Destino -->
       <div class="input-row">
         <span style="font-size:16px; padding:0 6px;">🏁</span>
         <input type="text" id="destInput" placeholder="DESTINO: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
-        <button class="icon-btn" onclick="clearDestination()" title="Borrar Destino">❌</button>
+        <button class="icon-btn" onclick="clearDestination()">❌</button>
       </div>
-
       <div id="suggestions" class="suggestions-list"></div>
     </div>
-
     <div class="action-btns">
       <button class="btn btn-primary" onclick="calculateRoute()">🚀 Ir</button>
     </div>
   </div>
 
-  <!-- BURBUJAS FLOTANTES -->
+  <!-- Burbujas Flotantes -->
   <div class="floating-controls overlay">
-    <!-- Fijar Origen -->
-    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Marcar punto de origen en el mapa">🚗</button>
-
-    <!-- Botón único Modo Oscuro / Claro -->
-    <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Activar Modo Oscuro">🌙</button>
+    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen">🚗</button>
+    <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Modo Oscuro">🌙</button>
+    <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
 
     <!-- Inspecciones -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
-        <div class="menu-item" onclick="reportIncident('control_municipal', '🏛️ Control Municipal')"><span>🏛️</span> Control Municipal</div>
-        <div class="menu-item" onclick="reportIncident('itv', '🔍 ITV')"><span>🔍</span> ITV</div>
-        <div class="menu-item" onclick="reportIncident('radar', '📷 Radar')"><span>📷</span> Radar</div>
-        <div class="menu-item" onclick="reportIncident('control_transito', '🚘 Control de Tránsito')"><span>🚘</span> Control de Tránsito</div>
-        <div class="menu-item" onclick="reportIncident('control_transporte', '🚌 Control Transporte')"><span>🚌</span> Control Transporte</div>
-        <div class="menu-item" onclick="reportIncident('control_policial', '🚨 Control Policial')"><span>🚨</span> Control Policial</div>
+        <div class="menu-item" onclick="reportIncident('control_municipal', 'Control Municipal')"><span>🏛️</span> Control Municipal</div>
+        <div class="menu-item" onclick="reportIncident('itv', 'ITV')"><span>🔍</span> ITV</div>
+        <div class="menu-item" onclick="reportIncident('radar', 'Radar de velocidad')"><span>📷</span> Radar</div>
+        <div class="menu-item" onclick="reportIncident('control_transito', 'Control de Tránsito')"><span>🚘</span> Control de Tránsito</div>
+        <div class="menu-item" onclick="reportIncident('control_policial', 'Control Policial')"><span>🚨</span> Control Policial</div>
       </div>
       <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
     </div>
@@ -263,9 +201,9 @@
     <!-- Imprevistos -->
     <div class="bubble-group">
       <div class="menu-options" id="alertOptions">
-        <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')"><span>🕳️</span> Bache</div>
-        <div class="menu-item" onclick="reportIncident('manifestacion', '🪧 Manifestación')"><span>🪧</span> Manifestación</div>
-        <div class="menu-item" onclick="reportIncident('corte', '🚧 Corte de Calle')"><span>🚧</span> Corte de Calle</div>
+        <div class="menu-item" onclick="reportIncident('bache', 'Bache peligroso')"><span>🕳️</span> Bache</div>
+        <div class="menu-item" onclick="reportIncident('manifestacion', 'Manifestación')"><span>🪧</span> Manifestación</div>
+        <div class="menu-item" onclick="reportIncident('corte', 'Corte de Calle')"><span>🚧</span> Corte de Calle</div>
       </div>
       <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
     </div>
@@ -289,51 +227,61 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        for (let registration of registrations) { registration.unregister(); }
-      });
-    }
-
     const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
     let map, userPos = null, destPos = null;
     let currentRoute = null, detourRoute = null;
-    let availableDetours = [];
-    let currentDetourIndex = 0;
-
+    let availableDetours = [], currentDetourIndex = 0;
     let routeLayerGroup = null, detourLayerGroup = null;
     let userMarker = null, destMarker = null;
     let activeIncidents = [];
-    let debounceTimer = null;
-    let settingOriginMode = false;
-    let activeInputTarget = 'dest';
-    let isDarkMode = false; // Estado inicial: Modo Claro
+    let debounceTimer = null, settingOriginMode = false;
+    let activeInputTarget = 'dest', isDarkMode = false, isVoiceActive = true;
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
       getUserLocation();
     });
 
+    // MÓDULO DE VOZ
+    function speak(text) {
+      if (!isVoiceActive || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'es-AR';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function toggleVoice() {
+      isVoiceActive = !isVoiceActive;
+      const btn = document.getElementById('voiceToggleBtn');
+      if (isVoiceActive) {
+        btn.textContent = '🔊';
+        btn.title = 'Voz Activada';
+        showToast('🔊 Dictado por voz activado', true);
+      } else {
+        btn.textContent = '🔇';
+        btn.title = 'Voz Desactivada';
+        window.speechSynthesis.cancel();
+        showToast('🔇 Dictado por voz silenciado', false);
+      }
+    }
+
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
-
-      // Mapa base CARTO POSITRON (Claro por defecto)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
+        maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
 
       setTimeout(() => { map.invalidateSize(); }, 300);
-      window.addEventListener('resize', () => { map.invalidateSize(); });
 
       map.on('click', function(e) {
         document.getElementById('suggestions').style.display = 'none';
         closeAllMenus();
-        
         if (settingOriginMode) {
           setOriginFromMap(e.latlng);
           settingOriginMode = false;
@@ -343,24 +291,19 @@
       });
     }
 
-    // Función para alternar entre Claro y Oscuro
     function toggleDarkMode() {
       isDarkMode = !isDarkMode;
       const btn = document.getElementById('darkModeBtn');
       closeAllMenus();
 
       if (isDarkMode) {
-        // Filtro matemático para volver oscuro estilo Uber el mapa base
         document.documentElement.style.setProperty('--tile-filter', 'invert(95%) hue-rotate(200deg) grayscale(60%) brightness(90%) contrast(110%)');
         btn.textContent = '☀️';
-        btn.title = 'Activar Modo Claro';
-        showToast('🌙 Modo Oscuro Activado');
+        showToast('Modo Oscuro Activado', true);
       } else {
-        // Volver al mapa blanco/claro limpio original
         document.documentElement.style.setProperty('--tile-filter', 'grayscale(100%) brightness(1.05)');
         btn.textContent = '🌙';
-        btn.title = 'Activar Modo Oscuro';
-        showToast('☀️ Modo Claro Activado');
+        showToast('Modo Claro Activado', true);
       }
     }
 
@@ -372,7 +315,7 @@
           document.getElementById('originInput').value = 'Mi ubicación actual';
           updateUserMarker();
           map.setView(userPos, 15);
-          showToast('📍 Posición GPS fijada');
+          showToast('Ubicación GPS fijada', true);
         },
         () => {
           userPos = DEFAULT_ORIGIN;
@@ -399,27 +342,22 @@
 
     function enableSetOriginMode() {
       settingOriginMode = true;
-      showToast('👉 Tocá en el mapa para fijar tu ORIGEN (🚗)');
+      showToast('Tocá en el mapa para fijar tu origen', true);
     }
 
     async function setOriginFromMap(latlng) {
       userPos = [latlng.lat, latlng.lng];
       updateUserMarker();
-      
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
         const data = await res.json();
-        if (data && data.display_name) {
-          document.getElementById('originInput').value = data.display_name.split(',')[0];
-        }
+        if (data && data.display_name) document.getElementById('originInput').value = data.display_name.split(',')[0];
       } catch(e){}
-
       if (destPos) recalculateSmartRoute();
     }
 
     async function setDestinationFromMap(latlng) {
       destPos = [latlng.lat, latlng.lng];
-
       if (destMarker) map.removeLayer(destMarker);
       destMarker = L.marker(destPos, {
         icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
@@ -428,9 +366,7 @@
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json`);
         const data = await res.json();
-        if (data && data.display_name) {
-          document.getElementById('destInput').value = data.display_name.split(',')[0];
-        }
+        if (data && data.display_name) document.getElementById('destInput').value = data.display_name.split(',')[0];
       } catch(e){}
 
       if (userPos) recalculateSmartRoute();
@@ -440,11 +376,7 @@
       activeInputTarget = target;
       clearTimeout(debounceTimer);
       const suggBox = document.getElementById('suggestions');
-      
-      if (!query || query.trim().length < 2) {
-        suggBox.style.display = 'none'; 
-        return;
-      }
+      if (!query || query.trim().length < 2) { suggBox.style.display = 'none'; return; }
 
       debounceTimer = setTimeout(async () => {
         const url = `${NOMINATIM_URL}?q=${encodeURIComponent(query + ', Córdoba, Argentina')}&format=json&limit=5`;
@@ -459,7 +391,6 @@
               item.textContent = place.display_name;
               item.onclick = () => {
                 const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
-                
                 if (activeInputTarget === 'origin') {
                   userPos = latlng;
                   document.getElementById('originInput').value = place.display_name.split(',')[0];
@@ -472,7 +403,6 @@
                     icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                   }).addTo(map);
                 }
-
                 suggBox.style.display = 'none';
                 map.setView(latlng, 15);
                 if (userPos && destPos) recalculateSmartRoute();
@@ -490,7 +420,6 @@
       document.getElementById('originInput').value = '';
       if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
       clearRoutes();
-      showToast('Origen eliminado');
     }
 
     function clearDestination() {
@@ -498,7 +427,6 @@
       document.getElementById('destInput').value = '';
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
       clearRoutes();
-      showToast('Destino eliminado');
     }
 
     function clearRoutes() {
@@ -540,7 +468,7 @@
       popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div>`;
       
       const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'popup-delete-btn';
+      deleteBtn.style.cssText = 'background:#ff0055; color:#fff; border:none; padding:8px 12px; border-radius:8px; width:100%; margin-top:6px; cursor:pointer; font-weight:800;';
       deleteBtn.innerHTML = '❌ ELIMINAR';
       deleteBtn.onclick = () => { 
         map.removeLayer(incidentMarker); 
@@ -557,7 +485,7 @@
         recalculateSmartRoute();
       });
 
-      showToast(`¡${label} fijado! Recalculando...`);
+      showToast(`Atención: Alerta de ${label} reportada`, true);
       recalculateSmartRoute();
     }
 
@@ -581,7 +509,7 @@
     function calculateRoute() {
       document.getElementById('suggestions').style.display = 'none';
       if (!userPos || !destPos) {
-        showToast('⚠️ Definí Origen y Destino primero');
+        showToast('Por favor, definí origen y destino primero', true);
         return;
       }
       recalculateSmartRoute();
@@ -622,7 +550,6 @@
       for (let incident of activeIncidents) {
         const cLat = incident.pos[0];
         const cLng = incident.pos[1];
-
         for (let latOff of offsets) {
           for (let lngOff of offsets) {
             const bypass = [cLat + latOff, cLng + lngOff];
@@ -653,20 +580,15 @@
 
         renderCurrentDetour();
         document.getElementById('btnDetour').style.display = 'block';
-        
-        if (availableDetours.length > 1) {
-          document.getElementById('btnNextDetour').style.display = 'block';
-        } else {
-          document.getElementById('btnNextDetour').style.display = 'none';
-        }
+        document.getElementById('btnNextDetour').style.display = availableDetours.length > 1 ? 'block' : 'none';
 
-        showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s)`);
+        showToast(`Atención: Se hallaron ${availableDetours.length} atajo seguro para evitar controles`, true);
       } else {
         if (detourLayerGroup) map.removeLayer(detourLayerGroup);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
-        showToast('⚠️ No se hallaron desvíos libres cerca');
+        showToast('Precaución: No se hallaron rutas despejadas cercanas', true);
       }
     }
 
@@ -680,7 +602,7 @@
       if (availableDetours.length <= 1) return;
       currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
       renderCurrentDetour();
-      showToast(`🔀 Atajo ${currentDetourIndex + 1} de ${availableDetours.length}`);
+      showToast(`Atajo alternativo ${currentDetourIndex + 1}`, true);
     }
 
     function getDistanceMeters(p1, p2) {
@@ -701,25 +623,10 @@
       const mainColor = isDetour ? '#ff007f' : '#00f3ff';
       const coreColor = isDetour ? '#ffb3d9' : '#ffffff';
 
-      const glowLine = L.polyline(coords, {
-        color: mainColor,
-        weight: isDetour ? 12 : 14,
-        opacity: 0.45,
-        lineCap: 'round',
-        lineJoin: 'round'
-      });
+      const glowLine = L.polyline(coords, { color: mainColor, weight: isDetour ? 12 : 14, opacity: 0.45, lineCap: 'round', lineJoin: 'round' });
+      const coreLine = L.polyline(coords, { color: coreColor, weight: isDetour ? 5 : 6, opacity: 1, lineCap: 'round', lineJoin: 'round' });
 
-      const coreLine = L.polyline(coords, {
-        color: coreColor,
-        weight: isDetour ? 5 : 6,
-        opacity: 1,
-        lineCap: 'round',
-        lineJoin: 'round'
-      });
-
-      group.addLayer(glowLine);
-      group.addLayer(coreLine);
-      group.addTo(map);
+      group.addLayer(glowLine); group.addLayer(coreLine); group.addTo(map);
 
       if (isDetour) detourLayerGroup = group;
       else routeLayerGroup = group;
@@ -728,7 +635,8 @@
     function updateNavInfo(routeData) {
       document.getElementById('navPanel').style.display = 'flex';
       document.getElementById('btnStart').style.display = 'block';
-      document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
+      const distKm = (routeData.distance / 1000).toFixed(1);
+      document.getElementById('navDistance').textContent = `${distKm} km`;
       document.getElementById('navStreet').textContent = 'RUTA CALCULADA';
     }
 
@@ -739,7 +647,7 @@
       currentRoute = detourRoute;
       document.getElementById('btnDetour').style.display = 'none';
       document.getElementById('btnNextDetour').style.display = 'none';
-      showToast('Navegando por el atajo neón');
+      showToast('Navegando por el atajo neón', true);
     }
 
     function startNavigation() {
@@ -749,7 +657,7 @@
       document.getElementById('btnStop').style.display = 'block';
       document.getElementById('navStreet').textContent = 'NAVEGANDO...';
       document.getElementById('navDetail').textContent = 'Modo ruta activa';
-      showToast('🚀 Viaje iniciado');
+      showToast('Viaje iniciado. Buen viaje', true);
     }
 
     function stopNavigation() {
@@ -757,13 +665,14 @@
       document.getElementById('btnStart').style.display = 'block';
       document.getElementById('navStreet').textContent = 'SISTEMA LISTO';
       document.getElementById('navDetail').textContent = 'Tocá "Iniciar viaje" para comenzar';
-      showToast('⏹️ Viaje finalizado');
+      showToast('Viaje finalizado', true);
     }
 
-    function showToast(msg) {
+    function showToast(msg, speakIt = false) {
       const toast = document.getElementById('toast');
       toast.textContent = msg;
       toast.classList.add('show');
+      if (speakIt) speak(msg);
       setTimeout(() => { toast.classList.remove('show'); }, 3000);
     }
   </script>
