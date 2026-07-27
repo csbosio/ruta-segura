@@ -4,21 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   
-  <!-- CABECERAS ANTI-CACHÉ ESTRUCTURALES -->
+  <!-- CABECERAS ANTI-CACHÉ -->
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   
-  <title>Ruta Segura - Ultra Rápida</title>
+  <title>Ruta Segura - HUD Cyberpunk</title>
+  
+  <!-- FUENTE FUTURISTA -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f172a;
-      color: #fff;
+      font-family: 'Rajdhani', sans-serif;
+      background: #030712;
+      color: #00f3ff;
       overflow: hidden;
       height: 100vh;
       width: 100vw;
@@ -30,77 +36,102 @@
       width: 100%; 
       height: 100%; 
       z-index: 1; 
-      background: #e2e8f0; /* Fondo base claro mientras cargan los mosaicos */
+      background: #030712;
     }
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
     .overlay > * { pointer-events: auto; }
 
-    /* Barra Superior */
+    /* Barra Superior - HUD Style */
     .top-bar {
       top: 0; left: 0; right: 0;
-      padding: 12px 16px;
-      background: linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.7) 70%, transparent 100%);
-      display: flex; gap: 8px; align-items: flex-start;
+      padding: 14px 16px;
+      background: linear-gradient(180deg, rgba(3, 7, 18, 0.95) 0%, rgba(3, 7, 18, 0.6) 80%, transparent 100%);
+      display: flex; gap: 10px; align-items: flex-start;
     }
     .search-box { flex: 1; display: flex; flex-direction: column; gap: 8px; position: relative; }
     
     .input-row {
-      display: flex; align-items: center; background: rgba(30,41,59,0.95);
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; padding: 2px 8px;
+      display: flex; align-items: center; 
+      background: rgba(10, 15, 30, 0.85);
+      border: 1px solid rgba(0, 243, 255, 0.4); 
+      border-radius: 12px; padding: 2px 8px;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.15), inset 0 0 10px rgba(0, 243, 255, 0.05);
+      backdrop-filter: blur(12px);
+      transition: all 0.3s ease;
     }
-    .input-row:focus-within { border-color: #3b82f6; }
+    .input-row:focus-within { 
+      border-color: #00f3ff; 
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.5), inset 0 0 12px rgba(0, 243, 255, 0.2); 
+    }
     
     .input-row input {
       flex: 1; padding: 10px 6px; border: none; background: transparent;
-      color: #fff; font-size: 14px; outline: none; width: 100%;
+      color: #ffffff; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; outline: none; width: 100%;
     }
+    .input-row input::placeholder { color: rgba(0, 243, 255, 0.5); }
     
     .icon-btn {
-      background: none; border: none; color: #94a3b8; font-size: 15px;
+      background: none; border: none; color: #00f3ff; font-size: 16px;
       cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center;
+      text-shadow: 0 0 8px #00f3ff;
     }
-    .icon-btn:active { color: #fff; transform: scale(1.1); }
+    .icon-btn:active { transform: scale(1.2); }
 
     .suggestions-list {
       position: absolute; top: 100%; left: 0; right: 0;
-      background: #1e293b; border: 1px solid rgba(255,255,255,0.3);
-      border-radius: 12px; margin-top: 4px; max-height: 220px; overflow-y: auto;
-      z-index: 9999 !important; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+      background: rgba(10, 15, 30, 0.95); 
+      border: 1px solid #00f3ff;
+      border-radius: 12px; margin-top: 6px; max-height: 220px; overflow-y: auto;
+      z-index: 9999 !important; display: none; 
+      box-shadow: 0 10px 30px rgba(0, 243, 255, 0.3);
+      backdrop-filter: blur(16px);
     }
     .suggestion-item {
-      padding: 12px 14px; font-size: 13px; color: #f1f5f9; cursor: pointer;
-      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 14px; font-size: 14px; color: #e2e8f0; cursor: pointer;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+      font-weight: 600;
     }
-    .suggestion-item:hover { background: #334155; color: #3b82f6; }
+    .suggestion-item:hover { background: rgba(0, 243, 255, 0.2); color: #00f3ff; }
     
-    .action-btns { display: flex; align-self: center; }
+    .action-btns { display: flex; align-self: stroke; }
     .btn {
-      padding: 12px 16px; border-radius: 12px; border: none; font-size: 14px;
-      font-weight: 700; cursor: pointer; white-space: nowrap; display: flex;
-      align-items: center; justify-content: center; height: 100%;
+      padding: 12px 18px; border-radius: 12px; border: none; font-size: 16px;
+      font-family: 'Rajdhani', sans-serif; font-weight: 800; cursor: pointer; white-space: nowrap; 
+      display: flex; align-items: center; justify-content: center; height: 100%;
+      text-transform: uppercase; letter-spacing: 1px;
+      transition: all 0.2s ease;
     }
-    .btn-primary { background: #3b82f6; color: #fff; }
-    .btn-danger { background: #ef4444; color: #fff; }
-    .btn-warning { background: #f59e0b; color: #000; }
-    .btn-success { background: #22c55e; color: #fff; }
+    .btn-primary { 
+      background: #00f3ff; color: #030712; 
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.6); 
+    }
+    .btn-primary:active { transform: scale(0.95); box-shadow: 0 0 30px rgba(0, 243, 255, 0.9); }
+    
+    .btn-danger { background: #ff0055; color: #fff; box-shadow: 0 0 20px rgba(255, 0, 85, 0.6); }
+    .btn-warning { background: #ffb700; color: #000; box-shadow: 0 0 20px rgba(255, 183, 0, 0.6); }
+    .btn-success { background: #00ff66; color: #030712; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
 
-    /* CONTENEDOR DE BURBUJAS DERECHA */
+    /* CONTENEDOR DE BURBUJAS FLOTANTES (NEÓN) */
     .floating-controls {
       position: absolute; right: 16px; top: 22%;
-      display: flex; flex-direction: column; gap: 14px;
+      display: flex; flex-direction: column; gap: 16px;
       align-items: flex-end; z-index: 1500;
     }
 
     .bubble-group { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 
     .fab-btn {
-      width: 52px; height: 52px; border-radius: 50%; font-size: 22px;
+      width: 54px; height: 54px; border-radius: 50%; font-size: 24px;
       display: flex; align-items: center; justify-content: center;
-      border: 2px solid #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      border: 2px solid #00f3ff; cursor: pointer; 
+      background: rgba(10, 15, 30, 0.85); backdrop-filter: blur(10px);
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+      transition: all 0.2s ease;
     }
-    .fab-gps { background: #10b981; color: #fff; }
-    .fab-horn { background: #2563eb; color: #fff; }
-    .fab-alert { background: #f59e0b; color: #000; }
+    .fab-btn:active { transform: scale(1.1); }
+    .fab-gps { border-color: #00ff66; box-shadow: 0 0 20px rgba(0, 255, 102, 0.5); }
+    .fab-horn { border-color: #00f3ff; box-shadow: 0 0 20px rgba(0, 243, 255, 0.5); }
+    .fab-alert { border-color: #ff0055; box-shadow: 0 0 20px rgba(255, 0, 85, 0.5); }
 
     .menu-options {
       display: none; flex-direction: column; gap: 8px; align-items: flex-end;
@@ -108,37 +139,61 @@
     .menu-options.active { display: flex; }
 
     .menu-item {
-      display: flex; align-items: center; gap: 8px;
-      background: rgba(15,23,42,0.95); padding: 8px 14px; border-radius: 20px;
-      border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 13px;
-      font-weight: 600; cursor: pointer; white-space: nowrap;
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(10, 15, 30, 0.9); padding: 10px 16px; border-radius: 20px;
+      border: 1px solid rgba(0, 243, 255, 0.4); color: #fff; font-size: 14px;
+      font-weight: 700; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+      backdrop-filter: blur(12px);
     }
-    .menu-item:active { background: #334155; }
+    .menu-item:active { background: rgba(0, 243, 255, 0.3); }
 
     .draggable-marker {
-      font-size: 24px; background: rgba(15,23,42,0.9); padding: 6px;
-      border-radius: 50%; border: 2px solid #f59e0b; text-align: center; cursor: grab;
+      font-size: 26px; background: rgba(10, 15, 30, 0.9); padding: 6px;
+      border-radius: 50%; border: 2px solid #ff0055; text-align: center; cursor: grab;
+      box-shadow: 0 0 20px #ff0055;
     }
 
-    /* Popups */
-    .leaflet-popup-content-wrapper { background: #0f172a !important; color: #fff !important; border-radius: 12px !important; }
-    .popup-delete-btn { background: #ef4444; color: #fff; border: none; padding: 6px 12px; border-radius: 8px; width: 100%; margin-top: 4px; cursor: pointer; }
+    /* Popups estilo Cyberpunk */
+    .leaflet-popup-content-wrapper { 
+      background: rgba(10, 15, 30, 0.95) !important; 
+      color: #00f3ff !important; 
+      border-radius: 12px !important; 
+      border: 1px solid #00f3ff !important;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4) !important;
+      font-family: 'Rajdhani', sans-serif !important;
+    }
+    .leaflet-popup-tip { background: #00f3ff !important; }
+    .popup-delete-btn { 
+      background: #ff0055; color: #fff; border: none; padding: 8px 12px; 
+      border-radius: 8px; width: 100%; margin-top: 6px; cursor: pointer; 
+      font-family: 'Rajdhani', sans-serif; font-weight: 800;
+      box-shadow: 0 0 12px rgba(255, 0, 85, 0.5);
+    }
 
-    /* Panel Inferior */
+    /* Panel Inferior HUD */
     .nav-panel {
       bottom: 0; left: 0; right: 0; padding: 0 16px 20px;
-      background: linear-gradient(0deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,0.85) 60%, transparent 100%);
-      display: flex; flex-direction: column; gap: 10px;
+      background: linear-gradient(0deg, rgba(3, 7, 18, 0.98) 0%, rgba(3, 7, 18, 0.7) 70%, transparent 100%);
+      display: flex; flex-direction: column; gap: 12px;
     }
-    .nav-instruction { background: rgba(30,41,59,0.95); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.1); }
-    .nav-instruction .street { font-size: 18px; font-weight: 700; color: #fff; }
-    .nav-instruction .distance { font-size: 26px; font-weight: 800; color: #3b82f6; }
+    .nav-instruction { 
+      background: rgba(10, 15, 30, 0.9); 
+      border-radius: 16px; padding: 18px; 
+      border: 1px solid rgba(0, 243, 255, 0.3); 
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+      backdrop-filter: blur(16px);
+    }
+    .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.5); }
+    .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; text-shadow: 0 0 15px #00f3ff; }
 
     .toast {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: rgba(15,23,42,0.95); color: #fff; padding: 12px 20px;
-      border-radius: 12px; font-size: 14px; z-index: 3000; display: none;
-      border: 1px solid rgba(255,255,255,0.2); text-align: center;
+      background: rgba(10, 15, 30, 0.95); color: #00f3ff; padding: 14px 24px;
+      border-radius: 12px; font-size: 16px; font-weight: 700; z-index: 3000; display: none;
+      border: 1px solid #00f3ff; text-align: center;
+      box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+      backdrop-filter: blur(16px);
     }
     .toast.show { display: block; }
   </style>
@@ -146,20 +201,20 @@
 <body>
   <div id="map"></div>
 
-  <!-- Barra Superior -->
+  <!-- Barra Superior HUD -->
   <div class="top-bar overlay">
     <div class="search-box">
       <!-- Fila 1: Origen -->
       <div class="input-row">
         <button class="icon-btn" onclick="getUserLocation()" title="Usar GPS actual">📍</button>
-        <input type="text" id="originInput" placeholder="Origen: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
+        <input type="text" id="originInput" placeholder="ORIGEN: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
         <button class="icon-btn" onclick="clearOrigin()" title="Borrar Origen">❌</button>
       </div>
       
       <!-- Fila 2: Destino -->
       <div class="input-row">
-        <span style="font-size:14px; padding:0 6px;">🏁</span>
-        <input type="text" id="destInput" placeholder="Destino: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
+        <span style="font-size:16px; padding:0 6px;">🏁</span>
+        <input type="text" id="destInput" placeholder="DESTINO: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
         <button class="icon-btn" onclick="clearDestination()" title="Borrar Destino">❌</button>
       </div>
 
@@ -171,11 +226,11 @@
     </div>
   </div>
 
-  <!-- BURBUJAS FLOTANTES DERECHA -->
+  <!-- BURBUJAS FLOTANTES NEÓN -->
   <div class="floating-controls overlay">
     <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Marcar punto de origen en el mapa">🚗</button>
 
-    <!-- Burbuja 1: Bocina (Controles e Inspecciones) -->
+    <!-- Inspecciones -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
         <div class="menu-item" onclick="reportIncident('control_municipal', '🏛️ Control Municipal')"><span>🏛️</span> Control Municipal</div>
@@ -188,7 +243,7 @@
       <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
     </div>
 
-    <!-- Burbuja 2: Alerta Triangular (Imprevistos Viales) -->
+    <!-- Imprevistos -->
     <div class="bubble-group">
       <div class="menu-options" id="alertOptions">
         <div class="menu-item" onclick="reportIncident('bache', '🕳️ Bache')"><span>🕳️</span> Bache</div>
@@ -203,13 +258,13 @@
   <div class="nav-panel overlay" id="navPanel" style="display:none;">
     <div class="nav-instruction">
       <div class="distance" id="navDistance">--</div>
-      <div class="street" id="navStreet">Ruta Lista</div>
-      <div class="detail" id="navDetail" style="color:#94a3b8; font-size:14px;">Tocá "Iniciar viaje" para comenzar</div>
+      <div class="street" id="navStreet">SISTEMA LISTO</div>
+      <div class="detail" id="navDetail" style="color:rgba(0, 243, 255, 0.7); font-size:14px; font-weight: 600;">Tocá "Iniciar viaje" para comenzar</div>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex; gap:10px;">
       <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
-      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío Seguro</button>
-      <button class="btn btn-primary" id="btnNextDetour" style="display:none; flex:0.6;" onclick="cycleNextDetour()">🔀 Otro Atajo</button>
+      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío</button>
+      <button class="btn btn-primary" id="btnNextDetour" style="display:none; flex:0.6;" onclick="cycleNextDetour()">🔀 Atajo</button>
       <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Finalizar</button>
     </div>
   </div>
@@ -217,7 +272,6 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    // ELIMINACIÓN AUTOMÁTICA DE CACHÉ DE SERVICE WORKERS
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         for (let registration of registrations) { registration.unregister(); }
@@ -233,7 +287,7 @@
     let availableDetours = [];
     let currentDetourIndex = 0;
 
-    let routeLayer = null, detourLayer = null;
+    let routeLayerGroup = null, detourLayerGroup = null;
     let userMarker = null, destMarker = null;
     let activeIncidents = [];
     let debounceTimer = null;
@@ -250,14 +304,13 @@
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
 
-      // Mosaico de calles de alta velocidad (CartoDB Voyager)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      // MAPA BASE DARK CYBERPUNK (CartoDB Dark Matter)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
         subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap'
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
 
-      // FORZAR A LEAFLET A RECALCULAR TAMAÑO (Evita pantalla gris)
       setTimeout(() => { map.invalidateSize(); }, 300);
       window.addEventListener('resize', () => { map.invalidateSize(); });
 
@@ -282,7 +335,7 @@
           document.getElementById('originInput').value = 'Mi ubicación actual';
           updateUserMarker();
           map.setView(userPos, 15);
-          showToast('📍 Ubicación detectada');
+          showToast('📍 Posición GPS fijada');
         },
         () => {
           userPos = DEFAULT_ORIGIN;
@@ -298,8 +351,8 @@
       if (!userMarker) {
         userMarker = L.marker(userPos, {
           icon: L.divIcon({
-            html: '<div style="width:20px;height:20px;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 0 10px #3b82f6;"></div>',
-            iconSize: [20, 20], iconAnchor: [10, 10]
+            html: '<div style="width:22px;height:22px;background:#00ff66;border-radius:50%;border:3px solid #fff;box-shadow:0 0 18px #00ff66;"></div>',
+            iconSize: [22, 22], iconAnchor: [11, 11]
           })
         }).addTo(map);
       } else {
@@ -332,7 +385,7 @@
 
       if (destMarker) map.removeLayer(destMarker);
       destMarker = L.marker(destPos, {
-        icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+        icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
       }).addTo(map);
 
       try {
@@ -379,7 +432,7 @@
                   document.getElementById('destInput').value = place.display_name.split(',')[0];
                   if (destMarker) map.removeLayer(destMarker);
                   destMarker = L.marker(destPos, {
-                    icon: L.divIcon({ html: '<div style="font-size:26px;">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                   }).addTo(map);
                 }
 
@@ -412,8 +465,8 @@
     }
 
     function clearRoutes() {
-      if (routeLayer) map.removeLayer(routeLayer);
-      if (detourLayer) map.removeLayer(detourLayer);
+      if (routeLayerGroup) map.removeLayer(routeLayerGroup);
+      if (detourLayerGroup) map.removeLayer(detourLayerGroup);
       document.getElementById('navPanel').style.display = 'none';
     }
 
@@ -438,7 +491,7 @@
         draggable: true,
         icon: L.divIcon({
           html: `<div class="draggable-marker">${emoji}</div>`,
-          iconSize: [36, 36], iconAnchor: [18, 18]
+          iconSize: [38, 38], iconAnchor: [19, 19]
         })
       }).addTo(map);
 
@@ -451,7 +504,7 @@
       
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'popup-delete-btn';
-      deleteBtn.innerHTML = '❌ Eliminar';
+      deleteBtn.innerHTML = '❌ ELIMINAR';
       deleteBtn.onclick = () => { 
         map.removeLayer(incidentMarker); 
         activeIncidents = activeIncidents.filter(i => i.id !== incidentObj.id);
@@ -467,7 +520,7 @@
         recalculateSmartRoute();
       });
 
-      showToast(`¡${label} agregado! Reevaluando...`);
+      showToast(`¡${label} fijado! Recalculando...`);
       recalculateSmartRoute();
     }
 
@@ -506,7 +559,6 @@
       });
     }
 
-    // ALGORITMO PARALELO ASÍNCRONO DE ALTA VELOCIDAD
     async function recalculateSmartRoute() {
       if (!userPos || !destPos) return;
 
@@ -514,18 +566,17 @@
       if (directRoutes.length === 0) return;
 
       currentRoute = directRoutes[0];
-      drawRoute(currentRoute.coords, '#3b82f6', false);
+      drawRoute(currentRoute.coords, false);
       updateNavInfo(currentRoute);
 
       if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
-        if (detourLayer) map.removeLayer(detourLayer);
+        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
         return;
       }
 
-      // Pre-generamos waypoints concéntricos inmediatos
       const offsets = [0.0012, -0.0012, 0.0022, -0.0022];
       let promises = [];
 
@@ -536,7 +587,6 @@
         for (let latOff of offsets) {
           for (let lngOff of offsets) {
             const bypass = [cLat + latOff, cLng + lngOff];
-            // Solo probamos waypoints que estén libres
             if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
               promises.push(fetchOSRM([userPos, bypass, destPos]));
             }
@@ -544,7 +594,6 @@
         }
       }
 
-      // EJECUCIÓN PARALELA DE PETICIONES (MULTITHREAD)
       const resultsArray = await Promise.all(promises);
       let validCandidates = [];
 
@@ -572,9 +621,9 @@
           document.getElementById('btnNextDetour').style.display = 'none';
         }
 
-        showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s) al instante`);
+        showToast(`⚡ ${availableDetours.length} atajo(s) calculado(s)`);
       } else {
-        if (detourLayer) map.removeLayer(detourLayer);
+        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
@@ -585,7 +634,7 @@
     function renderCurrentDetour() {
       if (availableDetours.length === 0) return;
       detourRoute = availableDetours[currentDetourIndex];
-      drawRoute(detourRoute.coords, '#f59e0b', true);
+      drawRoute(detourRoute.coords, true);
     }
 
     function cycleNextDetour() {
@@ -605,31 +654,56 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    function drawRoute(coords, color, isDetour) {
-      if (isDetour && detourLayer) map.removeLayer(detourLayer);
-      if (!isDetour && routeLayer) map.removeLayer(routeLayer);
+    // DIBUJO DE RUTAS ESTILO TUBOS DE NEÓN CON BRILLO (GLOW)
+    function drawRoute(coords, isDetour) {
+      if (isDetour && detourLayerGroup) map.removeLayer(detourLayerGroup);
+      if (!isDetour && routeLayerGroup) map.removeLayer(routeLayerGroup);
 
-      const layer = L.polyline(coords, { color: color, weight: isDetour ? 6 : 7, opacity: 0.9 }).addTo(map);
+      const group = L.layerGroup();
+      const mainColor = isDetour ? '#ff007f' : '#00f3ff';
+      const coreColor = isDetour ? '#ffb3d9' : '#ffffff';
 
-      if (isDetour) detourLayer = layer;
-      else routeLayer = layer;
+      // 1. Línea exterior ancha con opacidad (Efecto Halo/Glow)
+      const glowLine = L.polyline(coords, {
+        color: mainColor,
+        weight: isDetour ? 12 : 14,
+        opacity: 0.4,
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+
+      // 2. Línea interior brillante (Núcleo neón)
+      const coreLine = L.polyline(coords, {
+        color: coreColor,
+        weight: isDetour ? 5 : 6,
+        opacity: 1,
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+
+      group.addLayer(glowLine);
+      group.addLayer(coreLine);
+      group.addTo(map);
+
+      if (isDetour) detourLayerGroup = group;
+      else routeLayerGroup = group;
     }
 
     function updateNavInfo(routeData) {
       document.getElementById('navPanel').style.display = 'flex';
       document.getElementById('btnStart').style.display = 'block';
       document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
-      document.getElementById('navStreet').textContent = 'Ruta Lista';
+      document.getElementById('navStreet').textContent = 'RUTA CALCULADA';
     }
 
     function activateDetour() {
       if (!detourRoute) return;
-      drawRoute(detourRoute.coords, '#3b82f6', false);
-      if (detourLayer) map.removeLayer(detourLayer);
+      drawRoute(detourRoute.coords, false);
+      if (detourLayerGroup) map.removeLayer(detourLayerGroup);
       currentRoute = detourRoute;
       document.getElementById('btnDetour').style.display = 'none';
       document.getElementById('btnNextDetour').style.display = 'none';
-      showToast('Navegando por el atajo seleccionado');
+      showToast('Navegando por el atajo neón');
     }
 
     function startNavigation() {
