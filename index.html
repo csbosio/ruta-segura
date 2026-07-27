@@ -188,7 +188,7 @@
     <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Modo Oscuro">🌙</button>
     <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
 
-    <!-- MENÚ DE LIMPIEZA / BORRADO -->
+    <!-- MENÚ DE LIMPIEZA -->
     <div class="bubble-group">
       <div class="menu-options" id="clearOptions">
         <div class="menu-item" onclick="clearRouteOnly()"><span>🗺️</span> Eliminar Recorrido</div>
@@ -318,7 +318,6 @@
       }
     }
 
-    /* FUNCIONES DE LIMPIEZA SELECCIONABLE */
     function clearRouteOnly() {
       closeAllMenus();
       userPos = null;
@@ -533,7 +532,6 @@
 
     async function fetchOSRM(points) {
       const coords = points.map(p => `${p[1]},${p[0]}`).join(';');
-      // Pedimos hasta 3 alternativas nativas
       const url = `${OSRM_URL}${coords}?overview=full&geometries=geojson&steps=true&alternatives=3`;
       try {
         const res = await fetch(url);
@@ -589,45 +587,25 @@
 
       let validCandidates = [];
 
-      // 1. Verificar si alguna alternativa directa de OSRM esquiva los controles
+      // 1. Probar alternativas directas de OSRM
       for (let r of directRoutes) {
         if (isRouteSafe(r.coords)) {
           validCandidates.push(r);
         }
       }
 
-      // 2. Si no, generar puntos de desvío MÁS ALEJADOS (5, 10 y 15 cuadras de distancia)
+      // 2. NIVEL CERCANO (2 a 4 cuadras alrededor del conflicto)
       if (validCandidates.length === 0) {
-        const wideOffsets = [0.005, -0.005, 0.010, -0.010, 0.015, -0.015];
-        let promises = [];
+        validCandidates = await findBypassRoutes([0.002, -0.002, 0.004, -0.004]);
+      }
 
-        for (let incident of activeIncidents) {
-          const cLat = incident.pos[0];
-          const cLng = incident.pos[1];
-          for (let latOff of wideOffsets) {
-            for (let lngOff of wideOffsets) {
-              const bypass = [cLat + latOff, cLng + lngOff];
-              if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
-                promises.push(fetchOSRM([userPos, bypass, destPos]));
-              }
-            }
-          }
-        }
-
-        const resultsArray = await Promise.all(promises);
-
-        resultsArray.forEach(routes => {
-          routes.forEach(tRoute => {
-            if (isRouteSafe(tRoute.coords)) {
-              if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 50)) {
-                validCandidates.push(tRoute);
-              }
-            }
-          });
-        });
+      // 3. NIVEL AMPLIO (8 a 16 cuadras si hay múltiples cortes pegados)
+      if (validCandidates.length === 0) {
+        validCandidates = await findBypassRoutes([0.008, -0.008, 0.012, -0.012, 0.016, -0.016]);
       }
 
       if (validCandidates.length > 0) {
+        // Ordenar por menor distancia total (la opción más corta/rápida primero)
         validCandidates.sort((a, b) => a.distance - b.distance);
         availableDetours = validCandidates;
         currentDetourIndex = 0;
@@ -636,14 +614,45 @@
         document.getElementById('btnDetour').style.display = 'block';
         document.getElementById('btnNextDetour').style.display = availableDetours.length > 1 ? 'block' : 'none';
 
-        showToast(`Atención: Se hallaron ${availableDetours.length} atajo(s) seguro(s) alejados`, true);
+        showToast(`Atención: ${availableDetours.length} atajo(s) despejado(s) hallados`, true);
       } else {
         if (detourLayerGroup) map.removeLayer(detourLayerGroup);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
-        showToast('Precaución: No se hallaron rutas totalmente despejadas', true);
+        showToast('Precaución: No hay rutas completamente despejadas', true);
       }
+    }
+
+    async function findBypassRoutes(offsets) {
+      let promises = [];
+      for (let incident of activeIncidents) {
+        const cLat = incident.pos[0];
+        const cLng = incident.pos[1];
+        for (let latOff of offsets) {
+          for (let lngOff of offsets) {
+            const bypass = [cLat + latOff, cLng + lngOff];
+            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
+              promises.push(fetchOSRM([userPos, bypass, destPos]));
+            }
+          }
+        }
+      }
+
+      const resultsArray = await Promise.all(promises);
+      let candidates = [];
+
+      resultsArray.forEach(routes => {
+        routes.forEach(tRoute => {
+          if (isRouteSafe(tRoute.coords)) {
+            if (!candidates.some(r => Math.abs(r.distance - tRoute.distance) < 40)) {
+              candidates.push(tRoute);
+            }
+          }
+        });
+      });
+
+      return candidates;
     }
 
     function renderCurrentDetour() {
