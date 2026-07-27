@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   
-  <title>Ruta Segura - HUD Cyberpunk con Selección de Borrado</title>
+  <title>Ruta Segura - HUD Cyberpunk</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -533,7 +533,8 @@
 
     async function fetchOSRM(points) {
       const coords = points.map(p => `${p[1]},${p[0]}`).join(';');
-      const url = `${OSRM_URL}${coords}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+      // Pedimos hasta 3 alternativas nativas
+      const url = `${OSRM_URL}${coords}?overview=full&geometries=geojson&steps=true&alternatives=3`;
       try {
         const res = await fetch(url);
         const data = await res.json();
@@ -586,34 +587,45 @@
         return;
       }
 
-      const offsets = [0.0012, -0.0012, 0.0022, -0.0022];
-      let promises = [];
+      let validCandidates = [];
 
-      for (let incident of activeIncidents) {
-        const cLat = incident.pos[0];
-        const cLng = incident.pos[1];
-        for (let latOff of offsets) {
-          for (let lngOff of offsets) {
-            const bypass = [cLat + latOff, cLng + lngOff];
-            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
-              promises.push(fetchOSRM([userPos, bypass, destPos]));
-            }
-          }
+      // 1. Verificar si alguna alternativa directa de OSRM esquiva los controles
+      for (let r of directRoutes) {
+        if (isRouteSafe(r.coords)) {
+          validCandidates.push(r);
         }
       }
 
-      const resultsArray = await Promise.all(promises);
-      let validCandidates = [];
+      // 2. Si no, generar puntos de desvío MÁS ALEJADOS (5, 10 y 15 cuadras de distancia)
+      if (validCandidates.length === 0) {
+        const wideOffsets = [0.005, -0.005, 0.010, -0.010, 0.015, -0.015];
+        let promises = [];
 
-      resultsArray.forEach(routes => {
-        routes.forEach(tRoute => {
-          if (isRouteSafe(tRoute.coords)) {
-            if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 25)) {
-              validCandidates.push(tRoute);
+        for (let incident of activeIncidents) {
+          const cLat = incident.pos[0];
+          const cLng = incident.pos[1];
+          for (let latOff of wideOffsets) {
+            for (let lngOff of wideOffsets) {
+              const bypass = [cLat + latOff, cLng + lngOff];
+              if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
+                promises.push(fetchOSRM([userPos, bypass, destPos]));
+              }
             }
           }
+        }
+
+        const resultsArray = await Promise.all(promises);
+
+        resultsArray.forEach(routes => {
+          routes.forEach(tRoute => {
+            if (isRouteSafe(tRoute.coords)) {
+              if (!validCandidates.some(r => Math.abs(r.distance - tRoute.distance) < 50)) {
+                validCandidates.push(tRoute);
+              }
+            }
+          });
         });
-      });
+      }
 
       if (validCandidates.length > 0) {
         validCandidates.sort((a, b) => a.distance - b.distance);
@@ -624,13 +636,13 @@
         document.getElementById('btnDetour').style.display = 'block';
         document.getElementById('btnNextDetour').style.display = availableDetours.length > 1 ? 'block' : 'none';
 
-        showToast(`Atención: Se hallaron ${availableDetours.length} atajo seguro para evitar controles`, true);
+        showToast(`Atención: Se hallaron ${availableDetours.length} atajo(s) seguro(s) alejados`, true);
       } else {
         if (detourLayerGroup) map.removeLayer(detourLayerGroup);
         document.getElementById('btnDetour').style.display = 'none';
         document.getElementById('btnNextDetour').style.display = 'none';
         availableDetours = [];
-        showToast('Precaución: No se hallaron rutas despejadas cercanas', true);
+        showToast('Precaución: No se hallaron rutas totalmente despejadas', true);
       }
     }
 
