@@ -38,6 +38,12 @@
       z-index: 1; 
       background: #030712;
     }
+
+    /* REALCE DE CALLES Y TEXTOS (MÁS BLANCOS Y LEGIBLES) */
+    .leaflet-tile {
+      filter: brightness(1.45) contrast(1.35) saturate(1.1);
+    }
+
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
     .overlay > * { pointer-events: auto; }
 
@@ -52,7 +58,7 @@
     
     .input-row {
       display: flex; align-items: center; 
-      background: rgba(10, 15, 30, 0.85);
+      background: rgba(10, 15, 30, 0.9);
       border: 1px solid rgba(0, 243, 255, 0.4); 
       border-radius: 12px; padding: 2px 8px;
       box-shadow: 0 0 15px rgba(0, 243, 255, 0.15), inset 0 0 10px rgba(0, 243, 255, 0.05);
@@ -68,7 +74,7 @@
       flex: 1; padding: 10px 6px; border: none; background: transparent;
       color: #ffffff; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; outline: none; width: 100%;
     }
-    .input-row input::placeholder { color: rgba(0, 243, 255, 0.5); }
+    .input-row input::placeholder { color: rgba(0, 243, 255, 0.6); }
     
     .icon-btn {
       background: none; border: none; color: #00f3ff; font-size: 16px;
@@ -87,11 +93,11 @@
       backdrop-filter: blur(16px);
     }
     .suggestion-item {
-      padding: 12px 14px; font-size: 14px; color: #e2e8f0; cursor: pointer;
+      padding: 12px 14px; font-size: 14px; color: #ffffff; cursor: pointer;
       border-bottom: 1px solid rgba(0, 243, 255, 0.15);
       font-weight: 600;
     }
-    .suggestion-item:hover { background: rgba(0, 243, 255, 0.2); color: #00f3ff; }
+    .suggestion-item:hover { background: rgba(0, 243, 255, 0.25); color: #00f3ff; }
     
     .action-btns { display: flex; align-self: stroke; }
     .btn {
@@ -140,13 +146,13 @@
 
     .menu-item {
       display: flex; align-items: center; gap: 10px;
-      background: rgba(10, 15, 30, 0.9); padding: 10px 16px; border-radius: 20px;
-      border: 1px solid rgba(0, 243, 255, 0.4); color: #fff; font-size: 14px;
+      background: rgba(10, 15, 30, 0.95); padding: 10px 16px; border-radius: 20px;
+      border: 1px solid rgba(0, 243, 255, 0.5); color: #fff; font-size: 14px;
       font-weight: 700; cursor: pointer; white-space: nowrap;
-      box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+      box-shadow: 0 0 15px rgba(0, 243, 255, 0.25);
       backdrop-filter: blur(12px);
     }
-    .menu-item:active { background: rgba(0, 243, 255, 0.3); }
+    .menu-item:active { background: rgba(0, 243, 255, 0.35); }
 
     .draggable-marker {
       font-size: 26px; background: rgba(10, 15, 30, 0.9); padding: 6px;
@@ -180,11 +186,11 @@
     .nav-instruction { 
       background: rgba(10, 15, 30, 0.9); 
       border-radius: 16px; padding: 18px; 
-      border: 1px solid rgba(0, 243, 255, 0.3); 
-      box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+      border: 1px solid rgba(0, 243, 255, 0.4); 
+      box-shadow: 0 0 25px rgba(0, 243, 255, 0.2);
       backdrop-filter: blur(16px);
     }
-    .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.5); }
+    .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; text-shadow: 0 0 8px rgba(255,255,255,0.6); }
     .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; text-shadow: 0 0 15px #00f3ff; }
 
     .toast {
@@ -259,7 +265,7 @@
     <div class="nav-instruction">
       <div class="distance" id="navDistance">--</div>
       <div class="street" id="navStreet">SISTEMA LISTO</div>
-      <div class="detail" id="navDetail" style="color:rgba(0, 243, 255, 0.7); font-size:14px; font-weight: 600;">Tocá "Iniciar viaje" para comenzar</div>
+      <div class="detail" id="navDetail" style="color:rgba(0, 243, 255, 0.75); font-size:14px; font-weight: 600;">Tocá "Iniciar viaje" para comenzar</div>
     </div>
     <div style="display:flex; gap:10px;">
       <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
@@ -304,7 +310,7 @@
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
 
-      // MAPA BASE DARK CYBERPUNK (CartoDB Dark Matter)
+      // MAPA BASE DARK CYBERPUNK
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
         subdomains: 'abcd',
@@ -654,7 +660,7 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    // DIBUJO DE RUTAS ESTILO TUBOS DE NEÓN CON BRILLO (GLOW)
+    // TUBOS DE NEÓN CON GLOW
     function drawRoute(coords, isDetour) {
       if (isDetour && detourLayerGroup) map.removeLayer(detourLayerGroup);
       if (!isDetour && routeLayerGroup) map.removeLayer(routeLayerGroup);
@@ -663,16 +669,14 @@
       const mainColor = isDetour ? '#ff007f' : '#00f3ff';
       const coreColor = isDetour ? '#ffb3d9' : '#ffffff';
 
-      // 1. Línea exterior ancha con opacidad (Efecto Halo/Glow)
       const glowLine = L.polyline(coords, {
         color: mainColor,
         weight: isDetour ? 12 : 14,
-        opacity: 0.4,
+        opacity: 0.45,
         lineCap: 'round',
         lineJoin: 'round'
       });
 
-      // 2. Línea interior brillante (Núcleo neón)
       const coreLine = L.polyline(coords, {
         color: coreColor,
         weight: isDetour ? 5 : 6,
