@@ -259,7 +259,79 @@
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
       startLiveGPS();
+      loadState();
     });
+
+    // SISTEMA DE MEMORIA LOCAL (LocalStorage)
+    function saveState() {
+      localStorage.setItem('hud_darkMode', isDarkMode);
+      localStorage.setItem('hud_voice', isVoiceActive);
+      if (destPos) {
+        localStorage.setItem('hud_destPos', JSON.stringify(destPos));
+        localStorage.setItem('hud_destText', document.getElementById('destInput').value);
+      } else {
+        localStorage.removeItem('hud_destPos');
+        localStorage.removeItem('hud_destText');
+      }
+      const incData = activeIncidents.map(i => ({
+        id: i.id,
+        lat: i.pos[0],
+        lng: i.pos[1],
+        type: i.type,
+        label: i.label
+      }));
+      localStorage.setItem('hud_incidents', JSON.stringify(incData));
+    }
+
+    function loadState() {
+      // 1. Cargar Modo Oscuro
+      const savedDark = localStorage.getItem('hud_darkMode');
+      if (savedDark === 'true') {
+        isDarkMode = true;
+        const mapContainer = document.getElementById('map');
+        mapContainer.classList.add('dark-map');
+        mapContainer.style.background = '#1a2228';
+        document.getElementById('darkModeBtn').textContent = '☀️';
+      }
+
+      // 2. Cargar Voz
+      const savedVoice = localStorage.getItem('hud_voice');
+      if (savedVoice === 'false') {
+        isVoiceActive = false;
+        const btn = document.getElementById('voiceToggleBtn');
+        btn.textContent = '🔇';
+        btn.title = 'Voz Desactivada';
+      }
+
+      // 3. Cargar Destino
+      const savedDestPos = localStorage.getItem('hud_destPos');
+      const savedDestText = localStorage.getItem('hud_destText');
+      if (savedDestPos) {
+        destPos = JSON.parse(savedDestPos);
+        if (savedDestText) {
+          document.getElementById('destInput').value = savedDestText;
+        }
+        if (destMarker) map.removeLayer(destMarker);
+        destMarker = L.marker(destPos, {
+          icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+        }).addTo(map);
+      }
+
+      // 4. Cargar Controles e Incidencias reportadas
+      const savedIncidents = localStorage.getItem('hud_incidents');
+      if (savedIncidents) {
+        try {
+          const incArray = JSON.parse(savedIncidents);
+          incArray.forEach(inc => {
+            restoreIncidentMarker(inc.lat, inc.lng, inc.type, inc.label, inc.id);
+          });
+        } catch(e){}
+      }
+
+      if (userPos && destPos) {
+        recalculateSmartRoute();
+      }
+    }
 
     function speak(text) {
       if (!isVoiceActive || !('speechSynthesis' in window)) return;
@@ -284,6 +356,7 @@
         window.speechSynthesis.cancel();
         showToast('🔇 Dictado por voz silenciado', false);
       }
+      saveState();
     }
 
     function initMap() {
@@ -324,6 +397,7 @@
         btn.textContent = '🌙';
         showToast('Modo Claro Activado', true);
       }
+      saveState();
     }
 
     function clearRouteOnly() {
@@ -332,10 +406,10 @@
       document.getElementById('destInput').value = '';
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
       clearRoutes();
-      // GARANTÍA: El GPS de ubicación NUNCA se borra; se reasegura el origen en vivo
       if (navigator.geolocation) {
         startLiveGPS();
       }
+      saveState();
       showToast('Recorrido eliminado (GPS conservado)', true);
     }
 
@@ -346,6 +420,7 @@
       if (detourLayerGroup) map.removeLayer(detourLayerGroup);
       document.getElementById('btnDetour').style.display = 'none';
       document.getElementById('btnNextDetour').style.display = 'none';
+      saveState();
       showToast('Todos los controles eliminados', true);
       if (userPos && destPos) recalculateSmartRoute();
     }
@@ -353,7 +428,8 @@
     function clearEverything() {
       clearRouteOnly();
       clearIncidentsOnly();
-      showToast('Recorridos y controles eliminados (GPS activo)', true);
+      saveState();
+      showToast('Todo fue eliminado del mapa', true);
     }
 
     function startLiveGPS() {
@@ -437,10 +513,10 @@
         if (data && data.display_name) document.getElementById('destInput').value = data.display_name.split(',')[0];
       } catch(e){}
 
+      saveState();
       if (userPos) recalculateSmartRoute();
     }
 
-    // BUSCADOR MEJORADO: Soporta esquinas con "y" y prioriza cercanía en Córdoba
     function handleSearchInput(query, target) {
       activeInputTarget = target;
       clearTimeout(debounceTimer);
@@ -448,17 +524,11 @@
       if (!query || query.trim().length < 2) { suggBox.style.display = 'none'; return; }
 
       debounceTimer = setTimeout(async () => {
-        let cleanQuery = query.trim();
-
-        // 1. Detectar esquinas: convierte "alem y lopez" a "alem & lopez" internamente sin afectar tu input visual
-        cleanQuery = cleanQuery.replace(/\s+y\s+/gi, ' & ');
-
-        // 2. Forzar contexto local en Córdoba si no está especificado
+        let cleanQuery = query.trim().replace(/\s+y\s+/gi, ' & ');
         if (!cleanQuery.toLowerCase().includes('córdoba')) {
           cleanQuery += ', Córdoba, Argentina';
         }
 
-        // 3. Delimitador geográfico (Viewbox) centrado en Córdoba Capital para ordenar del más cercano al más lejano
         const viewboxCordoba = "-64.35,-31.30,-64.05,-31.55"; 
         const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=ar&viewbox=${viewboxCordoba}&bounded=0&limit=5`;
 
@@ -484,6 +554,7 @@
                   destMarker = L.marker(destPos, {
                     icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #00f3ff);">🏁</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                   }).addTo(map);
+                  saveState();
                 }
                 suggBox.style.display = 'none';
                 map.setView(latlng, 15);
@@ -497,7 +568,6 @@
       }, 250);
     }
 
-    // EL ORIGEN NUNCA SE BORRA: Al tocar este botón, se refirma y reactiva el GPS en vivo inmediatamente
     function clearOrigin() {
       startLiveGPS();
       showToast('🔄 Ubicación GPS restablecida y bloqueada', true);
@@ -508,6 +578,7 @@
       document.getElementById('destInput').value = '';
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
       clearRoutes();
+      saveState();
     }
 
     function clearRoutes() {
@@ -532,9 +603,17 @@
     function reportIncident(type, label) {
       closeAllMenus();
       const centerPos = map.getCenter();
+      createIncidentMarker(centerPos.lat, centerPos.lng, type, label, Date.now());
+      saveState();
+      showToast(`Atención: Alerta de ${label} reportada`, true);
+      recalculateSmartRoute();
+    }
+
+    function createIncidentMarker(lat, lng, type, label, id) {
+      const latlng = [lat, lng];
       const emoji = label.split(' ')[0];
       
-      const incidentMarker = L.marker(centerPos, {
+      const incidentMarker = L.marker(latlng, {
         draggable: true,
         icon: L.divIcon({
           html: `<div class="draggable-marker">${emoji}</div>`,
@@ -542,7 +621,7 @@
         })
       }).addTo(map);
 
-      const incidentObj = { id: Date.now(), pos: [centerPos.lat, centerPos.lng], marker: incidentMarker };
+      const incidentObj = { id: id || Date.now(), type, label, pos: latlng, marker: incidentMarker };
       activeIncidents.push(incidentObj);
 
       const popupContent = document.createElement('div');
@@ -555,6 +634,7 @@
       deleteBtn.onclick = () => { 
         map.removeLayer(incidentMarker); 
         activeIncidents = activeIncidents.filter(i => i.id !== incidentObj.id);
+        saveState();
         recalculateSmartRoute();
       };
       
@@ -564,11 +644,13 @@
       incidentMarker.on('dragend', function(event) {
         const newPos = event.target.getLatLng();
         incidentObj.pos = [newPos.lat, newPos.lng];
+        saveState();
         recalculateSmartRoute();
       });
+    }
 
-      showToast(`Atención: Alerta de ${label} reportada`, true);
-      recalculateSmartRoute();
+    function restoreIncidentMarker(lat, lng, type, label, id) {
+      createIncidentMarker(lat, lng, type, label, id);
     }
 
     async function fetchOSRM(points) {
