@@ -167,8 +167,8 @@
     <div class="search-box">
       <div class="input-row">
         <button class="icon-btn" onclick="startLiveGPS()" title="GPS Activo">📍</button>
-        <input type="text" id="originInput" placeholder="ORIGEN: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
-        <button class="icon-btn" onclick="clearOrigin()">❌</button>
+        <input type="text" id="originInput" placeholder="ORIGEN: GPS en vivo permanente..." oninput="handleSearchInput(this.value, 'origin')">
+        <button class="icon-btn" onclick="clearOrigin()" title="Restaurar GPS">🔄</button>
       </div>
       <div class="input-row">
         <span style="font-size:16px; padding:0 6px;">🏁</span>
@@ -184,7 +184,7 @@
 
   <!-- Burbujas Flotantes -->
   <div class="floating-controls overlay">
-    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen">🚗</button>
+    <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen Manual">🚗</button>
     <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Modo Oscuro">🌙</button>
     <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
 
@@ -328,14 +328,15 @@
 
     function clearRouteOnly() {
       closeAllMenus();
-      userPos = null;
       destPos = null;
-      document.getElementById('originInput').value = '';
       document.getElementById('destInput').value = '';
-      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
       clearRoutes();
-      showToast('Recorrido eliminado', true);
+      // GARANTÍA: El GPS de ubicación NUNCA se borra; se reasegura el origen en vivo
+      if (navigator.geolocation) {
+        startLiveGPS();
+      }
+      showToast('Recorrido eliminado (GPS conservado)', true);
     }
 
     function clearIncidentsOnly() {
@@ -352,7 +353,7 @@
     function clearEverything() {
       clearRouteOnly();
       clearIncidentsOnly();
-      showToast('Todo fue eliminado del mapa', true);
+      showToast('Recorridos y controles eliminados (GPS activo)', true);
     }
 
     function startLiveGPS() {
@@ -365,7 +366,7 @@
         navigator.geolocation.clearWatch(watchId);
       }
 
-      showToast('Activando radar GPS continuo...', false);
+      showToast('Radar GPS continuo activo...', false);
 
       watchId = navigator.geolocation.watchPosition(
         pos => {
@@ -496,11 +497,10 @@
       }, 250);
     }
 
+    // EL ORIGEN NUNCA SE BORRA: Al tocar este botón, se refirma y reactiva el GPS en vivo inmediatamente
     function clearOrigin() {
-      userPos = null;
-      document.getElementById('originInput').value = '';
-      if (userMarker) { map.removeLayer(userMarker); userMarker = null; }
-      clearRoutes();
+      startLiveGPS();
+      showToast('🔄 Ubicación GPS restablecida y bloqueada', true);
     }
 
     function clearDestination() {
@@ -591,7 +591,7 @@
     function calculateRoute() {
       document.getElementById('suggestions').style.display = 'none';
       if (!userPos || !destPos) {
-        showToast('Por favor, definí origen y destino primero', true);
+        showToast('Por favor, asegurá tu destino en el mapa', true);
         return;
       }
       recalculateSmartRoute();
