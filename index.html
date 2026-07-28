@@ -32,7 +32,13 @@
       top: 0; left: 0; 
       width: 100%; height: 100%; 
       z-index: 1; 
-      background: #000000;
+      background: #ffffff;
+      transition: background 0.3s ease;
+    }
+
+    /* MODO OSCURO: Invierte las teselas claras para obtener calles gruesas y blancas sólidas */
+    .leaflet-container.dark-map .leaflet-tile-pane {
+      filter: brightness(0.85) invert(1) contrast(3) hue-rotate(180deg);
     }
 
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
@@ -280,7 +286,7 @@
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
       
-      // Inicializar con mapa claro por defecto
+      // Siempre usamos light_all de base para tener trazados limpios y gruesos, que al invertir por CSS se ven perfectos
       tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
@@ -302,18 +308,17 @@
     function toggleDarkMode() {
       isDarkMode = !isDarkMode;
       const btn = document.getElementById('darkModeBtn');
+      const mapContainer = document.getElementById('map');
       closeAllMenus();
 
       if (isDarkMode) {
-        // Cambiar a teselas oscuras con calles blancas nativas
-        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png');
-        document.getElementById('map').style.background = '#0b0f19';
+        mapContainer.classList.add('dark-map');
+        mapContainer.style.background = '#0b0f19';
         btn.textContent = '☀️';
-        showToast('Modo Oscuro Activado (Calles blancas)', true);
+        showToast('Modo Oscuro: Calles blancas sólidas activadas', true);
       } else {
-        // Volver a teselas claras
-        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png');
-        document.getElementById('map').style.background = '#ffffff';
+        mapContainer.classList.remove('dark-map');
+        mapContainer.style.background = '#ffffff';
         btn.textContent = '🌙';
         showToast('Modo Claro Activado', true);
       }
