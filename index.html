@@ -18,10 +18,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   
   <style>
-    :root {
-      --tile-filter: grayscale(100%) brightness(1.05);
-    }
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Rajdhani', sans-serif;
@@ -36,12 +32,7 @@
       top: 0; left: 0; 
       width: 100%; height: 100%; 
       z-index: 1; 
-      background: #ffffff;
-    }
-
-    .leaflet-tile {
-      filter: var(--tile-filter);
-      transition: filter 0.4s ease;
+      background: #000000;
     }
 
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
@@ -166,7 +157,7 @@
   <div class="top-bar overlay">
     <div class="search-box">
       <div class="input-row">
-        <button class="icon-btn" onclick="getUserLocation()" title="GPS">📍</button>
+        <button class="icon-btn" onclick="startLiveGPS()" title="GPS Activo">📍</button>
         <input type="text" id="originInput" placeholder="ORIGEN: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'origin')">
         <button class="icon-btn" onclick="clearOrigin()">❌</button>
       </div>
@@ -198,24 +189,26 @@
       <button class="fab-btn fab-clear" onclick="toggleMenu('clearOptions')" title="Limpiar Mapa">🗑️</button>
     </div>
 
-    <!-- Inspecciones -->
+    <!-- Inspecciones (Controles) -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
         <div class="menu-item" onclick="reportIncident('control_municipal', 'Control Municipal')"><span>🏛️</span> Control Municipal</div>
         <div class="menu-item" onclick="reportIncident('itv', 'ITV')"><span>🔍</span> ITV</div>
         <div class="menu-item" onclick="reportIncident('radar', 'Radar de velocidad')"><span>📷</span> Radar</div>
+        <div class="menu-item" onclick="reportIncident('itv_radar', 'ITV + Radar')"><span>🔍📷</span> ITV + Radar</div>
         <div class="menu-item" onclick="reportIncident('control_transito', 'Control de Tránsito')"><span>🚘</span> Control de Tránsito</div>
         <div class="menu-item" onclick="reportIncident('control_policial', 'Control Policial')"><span>🚨</span> Control Policial</div>
       </div>
       <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
     </div>
 
-    <!-- Imprevistos -->
+    <!-- Imprevistos (Alertas) -->
     <div class="bubble-group">
       <div class="menu-options" id="alertOptions">
         <div class="menu-item" onclick="reportIncident('bache', 'Bache peligroso')"><span>🕳️</span> Bache</div>
         <div class="menu-item" onclick="reportIncident('manifestacion', 'Manifestación')"><span>🪧</span> Manifestación</div>
         <div class="menu-item" onclick="reportIncident('corte', 'Corte de Calle')"><span>🚧</span> Corte de Calle</div>
+        <div class="menu-item" onclick="reportIncident('corte_parcial', 'Corte de media calzada')"><span>🔶</span> Corte de media calzada</div>
       </div>
       <button class="fab-btn fab-alert" onclick="toggleMenu('alertOptions')">⚠️</button>
     </div>
@@ -243,7 +236,7 @@
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
-    let map, userPos = null, destPos = null;
+    let map, tileLayer = null, userPos = null, destPos = null;
     let currentRoute = null, detourRoute = null;
     let availableDetours = [], currentDetourIndex = 0;
     let routeLayerGroup = null, detourLayerGroup = null;
@@ -251,10 +244,12 @@
     let activeIncidents = [];
     let debounceTimer = null, settingOriginMode = false;
     let activeInputTarget = 'dest', isDarkMode = false, isVoiceActive = true;
+    let watchId = null;
+    let isNavigating = false;
 
     document.addEventListener('DOMContentLoaded', () => {
       initMap();
-      getUserLocation();
+      startLiveGPS();
     });
 
     function speak(text) {
@@ -284,7 +279,9 @@
 
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
+      
+      // Inicializar con mapa claro por defecto
+      tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
 
@@ -308,11 +305,15 @@
       closeAllMenus();
 
       if (isDarkMode) {
-        document.documentElement.style.setProperty('--tile-filter', 'invert(95%) hue-rotate(200deg) grayscale(60%) brightness(90%) contrast(110%)');
+        // Cambiar a teselas oscuras con calles blancas nativas
+        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png');
+        document.getElementById('map').style.background = '#0b0f19';
         btn.textContent = '☀️';
-        showToast('Modo Oscuro Activado', true);
+        showToast('Modo Oscuro Activado (Calles blancas)', true);
       } else {
-        document.documentElement.style.setProperty('--tile-filter', 'grayscale(100%) brightness(1.05)');
+        // Volver a teselas claras
+        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png');
+        document.getElementById('map').style.background = '#ffffff';
         btn.textContent = '🌙';
         showToast('Modo Claro Activado', true);
       }
@@ -347,22 +348,41 @@
       showToast('Todo fue eliminado del mapa', true);
     }
 
-    function getUserLocation() {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
+    function startLiveGPS() {
+      if (!navigator.geolocation) {
+        showToast('Tu navegador no soporta geolocalización', true);
+        return;
+      }
+
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+
+      showToast('Activando radar GPS continuo...', false);
+
+      watchId = navigator.geolocation.watchPosition(
         pos => {
           userPos = [pos.coords.latitude, pos.coords.longitude];
-          document.getElementById('originInput').value = 'Mi ubicación actual';
+          document.getElementById('originInput').value = 'Mi ubicación actual (GPS vivo)';
           updateUserMarker();
-          map.setView(userPos, 15);
-          showToast('Ubicación GPS fijada', true);
+
+          if (isNavigating) {
+            map.setView(userPos, 16, { animate: true });
+          }
         },
-        () => {
-          userPos = DEFAULT_ORIGIN;
-          document.getElementById('originInput').value = 'Córdoba Centro';
-          updateUserMarker();
+        err => {
+          console.warn('Error de GPS:', err.message);
+          if (!userPos) {
+            userPos = DEFAULT_ORIGIN;
+            document.getElementById('originInput').value = 'Córdoba Centro (Predeterminado)';
+            updateUserMarker();
+          }
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        {
+          enableHighAccuracy: true,
+          maximumAge: 0,
+          timeout: 10000
+        }
       );
     }
 
@@ -371,8 +391,8 @@
       if (!userMarker) {
         userMarker = L.marker(userPos, {
           icon: L.divIcon({
-            html: '<div style="width:22px;height:22px;background:#00ff66;border-radius:50%;border:3px solid #fff;box-shadow:0 0 18px #00ff66;"></div>',
-            iconSize: [22, 22], iconAnchor: [11, 11]
+            html: '<div style="width:24px;height:24px;background:#00ff66;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #00ff66;"></div>',
+            iconSize: [24, 24], iconAnchor: [12, 12]
           })
         }).addTo(map);
       } else {
@@ -382,7 +402,7 @@
 
     function enableSetOriginMode() {
       settingOriginMode = true;
-      showToast('Tocá en el mapa para fijar tu origen', true);
+      showToast('Tocá en el mapa para fijar tu origen manual', true);
     }
 
     async function setOriginFromMap(latlng) {
@@ -587,25 +607,21 @@
 
       let validCandidates = [];
 
-      // 1. Probar alternativas directas de OSRM
       for (let r of directRoutes) {
         if (isRouteSafe(r.coords)) {
           validCandidates.push(r);
         }
       }
 
-      // 2. NIVEL CERCANO (2 a 4 cuadras alrededor del conflicto)
       if (validCandidates.length === 0) {
         validCandidates = await findBypassRoutes([0.002, -0.002, 0.004, -0.004]);
       }
 
-      // 3. NIVEL AMPLIO (8 a 16 cuadras si hay múltiples cortes pegados)
       if (validCandidates.length === 0) {
         validCandidates = await findBypassRoutes([0.008, -0.008, 0.012, -0.012, 0.016, -0.016]);
       }
 
       if (validCandidates.length > 0) {
-        // Ordenar por menor distancia total (la opción más corta/rápida primero)
         validCandidates.sort((a, b) => a.distance - b.distance);
         availableDetours = validCandidates;
         currentDetourIndex = 0;
@@ -714,16 +730,18 @@
     }
 
     function startNavigation() {
+      isNavigating = true;
       document.getElementById('btnStart').style.display = 'none';
       document.getElementById('btnDetour').style.display = 'none';
       document.getElementById('btnNextDetour').style.display = 'none';
       document.getElementById('btnStop').style.display = 'block';
       document.getElementById('navStreet').textContent = 'NAVEGANDO...';
-      document.getElementById('navDetail').textContent = 'Modo ruta activa';
-      showToast('Viaje iniciado. Buen viaje', true);
+      document.getElementById('navDetail').textContent = 'Seguimiento de GPS en vivo activo';
+      showToast('Viaje iniciado. GPS en tiempo real activado', true);
     }
 
     function stopNavigation() {
+      isNavigating = false;
       document.getElementById('btnStop').style.display = 'none';
       document.getElementById('btnStart').style.display = 'block';
       document.getElementById('navStreet').textContent = 'SISTEMA LISTO';
