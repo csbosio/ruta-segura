@@ -36,9 +36,9 @@
       transition: background 0.3s ease;
     }
 
-    /* MODO OSCURO: Filtro optimizado para que las calles brillen en blanco sólido sin fundirse a negro */
+    /* MODO OSCURO: Estilo pizarra/gris oscuro nítido idéntico a referencias */
     .leaflet-container.dark-map .leaflet-tile-pane {
-      filter: invert(1) hue-rotate(180deg) brightness(1.8) contrast(2.2);
+      filter: brightness(1.3) contrast(1.4);
     }
 
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
@@ -286,6 +286,7 @@
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView(DEFAULT_ORIGIN, 14);
       
+      // Iniciamos con el mapa claro por defecto
       tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO'
       }).addTo(map);
@@ -312,12 +313,15 @@
 
       if (isDarkMode) {
         mapContainer.classList.add('dark-map');
-        mapContainer.style.background = '#0b0f19';
+        mapContainer.style.background = '#12161f';
+        // Usamos directamente los teselas oscuras oficiales de CARTO (estilo Uber / Cabify)
+        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png');
         btn.textContent = '☀️';
-        showToast('Modo Oscuro: Calles blancas activadas', true);
+        showToast('Modo Oscuro estilo Uber activado', true);
       } else {
         mapContainer.classList.remove('dark-map');
         mapContainer.style.background = '#ffffff';
+        tileLayer.setUrl('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png');
         btn.textContent = '🌙';
         showToast('Modo Claro Activado', true);
       }
