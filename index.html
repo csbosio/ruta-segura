@@ -136,7 +136,7 @@
     }
     .menu-item-danger { border-color: rgba(255, 51, 0, 0.8); }
 
-    /* SIN CÍRCULO NEGRO DE FONDO - ICONOS LIMPIOS Y FLOTANTES */
+    /* ICONOS LIMPIOS Y FLOTANTES SIN TEXTO */
     .draggable-marker {
       font-size: 28px; 
       background: transparent; 
@@ -261,6 +261,19 @@
     const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving/';
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
+
+    // MAPEO ESTRICTO DE EMOJIS/SÍMBOLOS (CERO LETRAS EN EL MAPA)
+    const incidentEmojis = {
+      'control_municipal': '🏛️',
+      'itv': '🔍',
+      'radar': '📷',
+      'itv_radar': '🔍📷',
+      'control_transito': '🚘',
+      'bache': '🕳️',
+      'manifestacion': '🪧',
+      'corte': '🚧',
+      'corte_parcial': '🔶'
+    };
 
     let map, tileLayer = null, userPos = null, destPos = null;
     let currentRoute = null, detourRoute = null;
@@ -534,7 +547,7 @@
 
     function updateAllIncidentMarkers() {
       activeIncidents.forEach(inc => {
-        const emoji = currentTheme === 'pacman' ? '👻' : inc.label.split(' ')[0];
+        const emoji = currentTheme === 'pacman' ? '👻' : (incidentEmojis[inc.type] || '⚠️');
         inc.marker.setIcon(L.divIcon({
           html: `<div class="draggable-marker">${emoji}</div>`,
           iconSize: [38, 38], iconAnchor: [19, 19]
@@ -671,7 +684,7 @@
 
     function createIncidentMarker(lat, lng, type, label, id) {
       const latlng = [lat, lng];
-      const emoji = currentTheme === 'pacman' ? '👻' : label.split(' ')[0];
+      const emoji = currentTheme === 'pacman' ? '👻' : (incidentEmojis[type] || '⚠️');
       
       const incidentMarker = L.marker(latlng, {
         draggable: true,
