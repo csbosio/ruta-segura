@@ -136,7 +136,7 @@
     }
     .menu-item-danger { border-color: rgba(255, 51, 0, 0.8); }
 
-    /* ICONOS LIMPIOS Y FLOTANTES SIN TEXTO */
+    /* MARCADORES LIMPIOS Y FLOTANTES SIN TEXTO */
     .draggable-marker {
       font-size: 28px; 
       background: transparent; 
@@ -216,7 +216,7 @@
       <button class="fab-btn fab-clear" onclick="toggleMenu('clearOptions')" title="Limpiar Mapa">🗑️</button>
     </div>
 
-    <!-- Controles (Fantasmas en modo Pac-Man) -->
+    <!-- Controles -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
         <div class="menu-item" onclick="reportIncident('control_municipal', 'Control Municipal')"><span>🏛️</span> Control Municipal</div>
@@ -262,7 +262,7 @@
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
-    // MAPEO ESTRICTO DE EMOJIS/SÍMBOLOS (CERO LETRAS EN EL MAPA)
+    // MAPEO ESTRICTO DE EMOJIS/SÍMBOLOS (SIN LETRAS)
     const incidentEmojis = {
       'control_municipal': '🏛️',
       'itv': '🔍',
@@ -443,7 +443,7 @@
         mapContainer.style.background = '#000000';
         themeBtn.textContent = '🟡';
         themeBtn.title = 'Modo Pac-Man Activo';
-        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Fantasmas = Controles, Pelotitas = Camino)', true);
+        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Pac-Man real y Fantasmas clásicos)', true);
       }
 
       updateUserMarker();
@@ -525,31 +525,56 @@
     function updateUserMarker() {
       if (!userPos) return;
       
+      // PAC-MAN VECTORIAL REAL CON BOCA CORTADA EN MODO PACMAN, SINO PUNTO DORADO/BLANCO
       const markerHtml = currentTheme === 'pacman' 
-        ? '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); text-align:center;">🟡</div>'
+        ? `<div style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9)); text-align:center;">
+             <svg width="36" height="36" viewBox="0 0 100 100">
+               <path d="M 50 50 L 92 22 A 50 50 0 1 0 92 78 Z" fill="#ffeb00"/>
+               <circle cx="50" cy="28" r="6" fill="#000"/>
+             </svg>
+           </div>`
         : '<div style="width:24px;height:24px;background:#ffb800;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #ffb800;"></div>';
 
       if (!userMarker) {
         userMarker = L.marker(userPos, {
           icon: L.divIcon({
             html: markerHtml,
-            iconSize: [28, 28], iconAnchor: [14, 14]
+            iconSize: [36, 36], iconAnchor: [18, 18]
           })
         }).addTo(map);
       } else {
         userMarker.setLatLng(userPos);
         userMarker.setIcon(L.divIcon({
           html: markerHtml,
-          iconSize: [28, 28], iconAnchor: [14, 14]
+          iconSize: [36, 36], iconAnchor: [18, 18]
         }));
       }
     }
 
+    function getGhostSvgHtml(type) {
+      let color = '#ff0000'; // Rojo (Blinky por defecto)
+      if (type === 'itv') color = '#00f3ff'; // Celeste (Inky)
+      else if (type === 'radar') color = '#ffb800'; // Naranja (Clyde)
+      else if (type === 'itv_radar' || type === 'manifestacion') color = '#ff77ff'; // Rosado (Pinky)
+      else if (type === 'control_transito') color = '#ff0000'; // Rojo
+      else if (type === 'bache') color = '#9900ff'; // Violeta
+      else if (type.includes('corte')) color = '#00ff66'; // Verde
+
+      return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">
+        <path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/>
+        <circle cx="8.5" cy="9.5" r="2" fill="#fff"/><circle cx="9" cy="9.5" r="1" fill="#000"/>
+        <circle cx="15.5" cy="9.5" r="2" fill="#fff"/><circle cx="16" cy="9.5" r="1" fill="#000"/>
+      </svg>`;
+    }
+
     function updateAllIncidentMarkers() {
       activeIncidents.forEach(inc => {
-        const emoji = currentTheme === 'pacman' ? '👻' : (incidentEmojis[inc.type] || '⚠️');
+        const markerContent = currentTheme === 'pacman' 
+          ? getGhostSvgHtml(inc.type) 
+          : `<div class="draggable-marker">${incidentEmojis[inc.type] || '⚠️'}</div>`;
+
         inc.marker.setIcon(L.divIcon({
-          html: `<div class="draggable-marker">${emoji}</div>`,
+          html: markerContent,
           iconSize: [38, 38], iconAnchor: [19, 19]
         }));
       });
@@ -684,12 +709,14 @@
 
     function createIncidentMarker(lat, lng, type, label, id) {
       const latlng = [lat, lng];
-      const emoji = currentTheme === 'pacman' ? '👻' : (incidentEmojis[type] || '⚠️');
+      const markerContent = currentTheme === 'pacman' 
+        ? getGhostSvgHtml(type) 
+        : `<div class="draggable-marker">${incidentEmojis[type] || '⚠️'}</div>`;
       
       const incidentMarker = L.marker(latlng, {
         draggable: true,
         icon: L.divIcon({
-          html: `<div class="draggable-marker">${emoji}</div>`,
+          html: markerContent,
           iconSize: [38, 38], iconAnchor: [19, 19]
         })
       }).addTo(map);
