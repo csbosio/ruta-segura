@@ -172,12 +172,12 @@
     <div class="search-box">
       <div class="input-row">
         <button class="icon-btn" onclick="startLiveGPS()" title="GPS Activo">📍</button>
-        <input type="text" id="originInput" placeholder="ORIGEN: GPS en vivo permanente..." oninput="handleSearchInput(this.value, 'origin')">
+        <input type="text" id="originInput" placeholder="ORIGEN: GPS vivo o esquina (ej: Colón & General Paz)..." oninput="handleSearchInput(this.value, 'origin')">
         <button class="icon-btn" onclick="clearOrigin()" title="Restaurar GPS">🔄</button>
       </div>
       <div class="input-row">
         <span style="font-size:16px; padding:0 6px;">🏁</span>
-        <input type="text" id="destInput" placeholder="DESTINO: escribí o tocá el mapa..." oninput="handleSearchInput(this.value, 'dest')">
+        <input type="text" id="destInput" placeholder="DESTINO: escribí esquina (ej: Colón y General Paz)..." oninput="handleSearchInput(this.value, 'dest')">
         <button class="icon-btn" onclick="clearDestination()">❌</button>
       </div>
       <div id="suggestions" class="suggestions-list"></div>
@@ -543,16 +543,15 @@
     }
 
     function getGhostSvgHtml(type) {
-      // Si es reporte de bache o imprevistos de calle, mostramos la kakita de WhatsApp 💩 en modo Pac-Man
       if (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') {
         return `<div style="font-size:32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent; text-align:center;">💩</div>`;
       }
 
-      let color = '#ff0000'; // Rojo (Blinky por defecto)
-      if (type === 'itv') color = '#00f3ff'; // Celeste (Inky)
-      else if (type === 'radar') color = '#ffb800'; // Naranja (Clyde)
-      else if (type === 'itv_radar') color = '#ff77ff'; // Rosado (Pinky)
-      else if (type === 'control_transito') color = '#ff0000'; // Rojo
+      let color = '#ff0000';
+      if (type === 'itv') color = '#00f3ff';
+      else if (type === 'radar') color = '#ffb800';
+      else if (type === 'itv_radar') color = '#ff77ff';
+      else if (type === 'control_transito') color = '#ff0000';
 
       return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">
         <path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/>
@@ -614,7 +613,10 @@
       if (!query || query.trim().length < 2) { suggBox.style.display = 'none'; return; }
 
       debounceTimer = setTimeout(async () => {
-        let cleanQuery = query.trim().replace(/\s+y\s+/gi, ' & ');
+        let cleanQuery = query.trim();
+        // Traducir conectores de intersección 'y' o '&' a formato apto para motores de búsqueda de mapas
+        cleanQuery = cleanQuery.replace(/\s+y\s+/gi, ' & ');
+
         if (!cleanQuery.toLowerCase().includes('córdoba')) {
           cleanQuery += ', Córdoba, Argentina';
         }
