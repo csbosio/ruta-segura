@@ -177,7 +177,7 @@
       </div>
       <div class="input-row">
         <span style="font-size:16px; padding:0 6px;">🏁</span>
-        <input type="text" id="destInput" placeholder="DESTINO: escribí esquina (ej: Colón y General Paz)..." oninput="handleSearchInput(this.value, 'dest')">
+        <input type="text" id="destInput" placeholder="DESTINO: escribí esquina (ej: Revolucion de Mayo y Madrid)..." oninput="handleSearchInput(this.value, 'dest')">
         <button class="icon-btn" onclick="clearDestination()">❌</button>
       </div>
       <div id="suggestions" class="suggestions-list"></div>
@@ -610,54 +610,72 @@
       activeInputTarget = target;
       clearTimeout(debounceTimer);
       const suggBox = document.getElementById('suggestions');
-      if (!query || query.trim().length < 2) { suggBox.style.display = 'none'; return; }
+      if (!query || query.trim().length < 2) { 
+        suggBox.style.display = 'none'; 
+        return; 
+      }
+
+      suggBox.innerHTML = '<div class="suggestion-item" style="color:rgba(0,243,255,0.7);">Buscando en Córdoba...</div>';
+      suggBox.style.display = 'block';
 
       debounceTimer = setTimeout(async () => {
         let cleanQuery = query.trim();
-        // Traducir conectores de intersección 'y' o '&' a formato apto para motores de búsqueda de mapas
-        cleanQuery = cleanQuery.replace(/\s+y\s+/gi, ' & ');
+        
+        // Generar variantes de búsqueda para intersecciones en Córdoba ('y' y '&')
+        let queriesToTry = [
+          cleanQuery + ', Córdoba, Argentina',
+          cleanQuery.replace(/\s+&\s+/gi, ' y ') + ', Córdoba, Argentina',
+          cleanQuery.replace(/\s+y\s+/gi, ' & ') + ', Córdoba, Argentina'
+        ];
+        queriesToTry = [...new Set(queriesToTry)];
 
-        if (!cleanQuery.toLowerCase().includes('córdoba')) {
-          cleanQuery += ', Córdoba, Argentina';
+        let foundPlaces = [];
+
+        for (let q of queriesToTry) {
+          const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(q)}&countrycodes=ar&limit=5`;
+          try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data && data.length > 0) {
+              foundPlaces = data;
+              break;
+            }
+          } catch (e) {}
         }
 
-        const viewboxCordoba = "-64.35,-31.30,-64.05,-31.55"; 
-        const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=ar&viewbox=${viewboxCordoba}&bounded=0&limit=5`;
-
-        try {
-          const res = await fetch(url);
-          const data = await res.json();
-          suggBox.innerHTML = '';
-          if (data && data.length > 0) {
-            data.forEach(place => {
-              const item = document.createElement('div');
-              item.className = 'suggestion-item';
-              item.textContent = place.display_name;
-              item.onclick = () => {
-                const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
-                if (activeInputTarget === 'origin') {
-                  userPos = latlng;
-                  document.getElementById('originInput').value = place.display_name.split(',')[0];
-                  updateUserMarker();
-                } else {
-                  destPos = latlng;
-                  document.getElementById('destInput').value = place.display_name.split(',')[0];
-                  if (destMarker) map.removeLayer(destMarker);
-                  destMarker = L.marker(destPos, {
-                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
-                  }).addTo(map);
-                  saveState();
-                }
-                suggBox.style.display = 'none';
-                map.setView(latlng, 15);
-                if (userPos && destPos) recalculateSmartRoute();
-              };
-              suggBox.appendChild(item);
-            });
-            suggBox.style.display = 'block';
-          }
-        } catch (e) {}
-      }, 250);
+        suggBox.innerHTML = '';
+        if (foundPlaces.length > 0) {
+          foundPlaces.forEach(place => {
+            const item = document.createElement('div');
+            item.className = 'suggestion-item';
+            item.textContent = place.display_name;
+            item.onclick = () => {
+              const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
+              if (activeInputTarget === 'origin') {
+                userPos = latlng;
+                document.getElementById('originInput').value = place.display_name.split(',')[0];
+                updateUserMarker();
+              } else {
+                destPos = latlng;
+                document.getElementById('destInput').value = place.display_name.split(',')[0];
+                if (destMarker) map.removeLayer(destMarker);
+                destMarker = L.marker(destPos, {
+                  icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                }).addTo(map);
+                saveState();
+              }
+              suggBox.style.display = 'none';
+              map.setView(latlng, 15);
+              if (userPos && destPos) recalculateSmartRoute();
+            };
+            suggBox.appendChild(item);
+          });
+          suggBox.style.display = 'block';
+        } else {
+          suggBox.innerHTML = '<div class="suggestion-item" style="color:#ff0055;">No se encontró la esquina. Probá escribir otra o seleccioná en el mapa.</div>';
+          suggBox.style.display = 'block';
+        }
+      }, 300);
     }
 
     function clearOrigin() {
