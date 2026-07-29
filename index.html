@@ -136,9 +136,14 @@
     }
     .menu-item-danger { border-color: rgba(255, 51, 0, 0.8); }
 
+    /* SIN CÍRCULO NEGRO DE FONDO - ICONOS LIMPIOS Y FLOTANTES */
     .draggable-marker {
-      font-size: 26px; background: rgba(8, 12, 24, 0.9); padding: 6px;
-      border-radius: 50%; border: 2px solid #ff0055; text-align: center;
+      font-size: 28px; 
+      background: transparent; 
+      border: none; 
+      padding: 0; 
+      text-align: center;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.9));
     }
 
     .nav-panel {
@@ -266,7 +271,6 @@
     let debounceTimer = null, settingOriginMode = false;
     let activeInputTarget = 'dest';
     
-    // MODOS: 'light' (Claro), 'dark' (Oscuro), 'pacman' (Pac-Man)
     let currentTheme = 'light';
     let isVoiceActive = true;
     let watchId = null;
@@ -299,7 +303,6 @@
     }
 
     function loadState() {
-      // 1. Cargar Tema (Claro, Oscuro o Pac-Man)
       const savedTheme = localStorage.getItem('hud_theme');
       if (savedTheme) {
         setTheme(savedTheme, false);
@@ -307,7 +310,6 @@
         setTheme('light', false);
       }
 
-      // 2. Cargar Voz
       const savedVoice = localStorage.getItem('hud_voice');
       if (savedVoice === 'false') {
         isVoiceActive = false;
@@ -316,7 +318,6 @@
         btn.title = 'Voz Desactivada';
       }
 
-      // 3. Cargar Destino
       const savedDestPos = localStorage.getItem('hud_destPos');
       const savedDestText = localStorage.getItem('hud_destText');
       if (savedDestPos) {
@@ -326,11 +327,10 @@
         }
         if (destMarker) map.removeLayer(destMarker);
         destMarker = L.marker(destPos, {
-          icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #ffb800);">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+          icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
         }).addTo(map);
       }
 
-      // 4. Cargar Controles / Incidencias
       const savedIncidents = localStorage.getItem('hud_incidents');
       if (savedIncidents) {
         try {
@@ -393,14 +393,12 @@
       });
     }
 
-    // CAMBIO DE TEMA: 3 MODOS
     function setTheme(theme, showToastMsg = true) {
       currentTheme = theme;
       closeAllMenus();
       const mapContainer = document.getElementById('map');
       const themeBtn = document.getElementById('themeBtn');
 
-      // Remover clases anteriores de capas de mapa
       mapContainer.classList.remove('dark-map', 'pacman-map');
 
       if (theme === 'light') {
@@ -425,7 +423,6 @@
 
       } else if (theme === 'pacman') {
         if (tileLayer) map.removeLayer(tileLayer);
-        // Usamos dark_all con filtro arcade para el laberinto
         tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
           maxZoom: 19, subdomains: 'abcd'
         }).addTo(map);
@@ -515,9 +512,8 @@
     function updateUserMarker() {
       if (!userPos) return;
       
-      // En modo Pac-Man, el usuario es el círculo amarillo 🟡 (Pac-Man)
       const markerHtml = currentTheme === 'pacman' 
-        ? '<div style="font-size:26px; filter: drop-shadow(0 0 12px #ffb800); text-align:center;">🟡</div>'
+        ? '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); text-align:center;">🟡</div>'
         : '<div style="width:24px;height:24px;background:#ffb800;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #ffb800;"></div>';
 
       if (!userMarker) {
@@ -566,7 +562,7 @@
       destPos = [latlng.lat, latlng.lng];
       if (destMarker) map.removeLayer(destMarker);
       destMarker = L.marker(destPos, {
-        icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #ffb800);">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+        icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
       }).addTo(map);
 
       try {
@@ -614,7 +610,7 @@
                   document.getElementById('destInput').value = place.display_name.split(',')[0];
                   if (destMarker) map.removeLayer(destMarker);
                   destMarker = L.marker(destPos, {
-                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 0 10px #ffb800);">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                   }).addTo(map);
                   saveState();
                 }
@@ -675,7 +671,6 @@
 
     function createIncidentMarker(lat, lng, type, label, id) {
       const latlng = [lat, lng];
-      // En modo Pac-Man, los controles son fantasmas 👻
       const emoji = currentTheme === 'pacman' ? '👻' : label.split(' ')[0];
       
       const incidentMarker = L.marker(latlng, {
@@ -868,13 +863,12 @@
 
       const group = L.layerGroup();
       
-      // EN MODO PACMAN: El camino se dibuja como pelotitas ··· (línea punteada)
       let mainColor = isDetour ? '#ff007f' : '#ffb800';
       let dashOption = null;
 
       if (currentTheme === 'pacman') {
         mainColor = isDetour ? '#ff007f' : '#ffb800';
-        dashOption = '3, 16'; // Simula las pelotitas del camino Pac-Man
+        dashOption = '3, 16';
       }
 
       const glowLine = L.polyline(coords, { 
