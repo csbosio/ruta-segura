@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   
-  <title>Ruta Segura - HUD Cyberpunk</title>
+  <title>Ruta Segura - HUD Cyberpunk & Pac-Man</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,9 +36,12 @@
       transition: background 0.3s ease;
     }
 
-    /* MODO PAC-MAN (Arcade Oscuro / Laberinto Clásico) */
+    /* ESTILOS DE MAPA SEGÚN MODO */
     .leaflet-container.dark-map .leaflet-tile-pane {
-      filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(110%);
+      filter: brightness(85%) contrast(115%);
+    }
+    .leaflet-container.pacman-map .leaflet-tile-pane {
+      filter: invert(100%) hue-rotate(180deg) brightness(70%) contrast(130%);
     }
 
     .overlay { position: absolute; z-index: 1000; pointer-events: none; }
@@ -117,7 +120,7 @@
       box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
     }
     .fab-gps { border-color: #00ff66; box-shadow: 0 0 20px rgba(0, 255, 102, 0.5); }
-    .fab-theme { border-color: #ffb800; box-shadow: 0 0 20px rgba(255, 184, 0, 0.6); } /* Amarillo Pac-Man */
+    .fab-theme { border-color: #ffb800; box-shadow: 0 0 20px rgba(255, 184, 0, 0.6); }
     .fab-voice { border-color: #ffb700; box-shadow: 0 0 20px rgba(255, 183, 0, 0.5); }
     .fab-clear { border-color: #ff3300; box-shadow: 0 0 20px rgba(255, 51, 0, 0.6); }
     .fab-horn { border-color: #00f3ff; box-shadow: 0 0 20px rgba(0, 243, 255, 0.5); }
@@ -185,8 +188,17 @@
   <!-- Burbujas Flotantes -->
   <div class="floating-controls overlay">
     <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen Manual">🚗</button>
-    <!-- MODO PAC-MAN (Alterna entre Modo Pac-Man Oscuro y Modo Claro) -->
-    <button class="fab-btn fab-theme" id="darkModeBtn" onclick="toggleDarkMode()" title="Modo Pac-Man">🟡</button>
+    
+    <!-- SELECCIÓN DE 3 MODOS: CLARO, OSCURO, PAC-MAN -->
+    <div class="bubble-group">
+      <div class="menu-options" id="themeOptions">
+        <div class="menu-item" onclick="setTheme('light')"><span>☀️</span> Modo Claro</div>
+        <div class="menu-item" onclick="setTheme('dark')"><span>🌙</span> Modo Oscuro</div>
+        <div class="menu-item" onclick="setTheme('pacman')"><span>🟡</span> Modo Pac-Man</div>
+      </div>
+      <button class="fab-btn fab-theme" id="themeBtn" onclick="toggleMenu('themeOptions')" title="Cambiar Tema">🎨</button>
+    </div>
+
     <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
 
     <!-- MENÚ DE LIMPIEZA -->
@@ -199,7 +211,7 @@
       <button class="fab-btn fab-clear" onclick="toggleMenu('clearOptions')" title="Limpiar Mapa">🗑️</button>
     </div>
 
-    <!-- Inspecciones (Controles - SIN Control Policial) -->
+    <!-- Controles (Fantasmas en modo Pac-Man) -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
         <div class="menu-item" onclick="reportIncident('control_municipal', 'Control Municipal')"><span>🏛️</span> Control Municipal</div>
@@ -252,7 +264,11 @@
     let userMarker = null, destMarker = null;
     let activeIncidents = [];
     let debounceTimer = null, settingOriginMode = false;
-    let activeInputTarget = 'dest', isDarkMode = false, isVoiceActive = true;
+    let activeInputTarget = 'dest';
+    
+    // MODOS: 'light' (Claro), 'dark' (Oscuro), 'pacman' (Pac-Man)
+    let currentTheme = 'light';
+    let isVoiceActive = true;
     let watchId = null;
     let isNavigating = false;
 
@@ -262,9 +278,8 @@
       loadState();
     });
 
-    // SISTEMA DE MEMORIA LOCAL (LocalStorage)
     function saveState() {
-      localStorage.setItem('hud_darkMode', isDarkMode);
+      localStorage.setItem('hud_theme', currentTheme);
       localStorage.setItem('hud_voice', isVoiceActive);
       if (destPos) {
         localStorage.setItem('hud_destPos', JSON.stringify(destPos));
@@ -284,14 +299,12 @@
     }
 
     function loadState() {
-      // 1. Cargar Modo Pac-Man
-      const savedDark = localStorage.getItem('hud_darkMode');
-      if (savedDark === 'true') {
-        isDarkMode = true;
-        const mapContainer = document.getElementById('map');
-        mapContainer.classList.add('dark-map');
-        mapContainer.style.background = '#0a0a12';
-        document.getElementById('darkModeBtn').textContent = '☀️';
+      // 1. Cargar Tema (Claro, Oscuro o Pac-Man)
+      const savedTheme = localStorage.getItem('hud_theme');
+      if (savedTheme) {
+        setTheme(savedTheme, false);
+      } else {
+        setTheme('light', false);
       }
 
       // 2. Cargar Voz
@@ -317,7 +330,7 @@
         }).addTo(map);
       }
 
-      // 4. Cargar Controles e Incidencias reportadas
+      // 4. Cargar Controles / Incidencias
       const savedIncidents = localStorage.getItem('hud_incidents');
       if (savedIncidents) {
         try {
@@ -380,23 +393,52 @@
       });
     }
 
-    function toggleDarkMode() {
-      isDarkMode = !isDarkMode;
-      const btn = document.getElementById('darkModeBtn');
-      const mapContainer = document.getElementById('map');
+    // CAMBIO DE TEMA: 3 MODOS
+    function setTheme(theme, showToastMsg = true) {
+      currentTheme = theme;
       closeAllMenus();
+      const mapContainer = document.getElementById('map');
+      const themeBtn = document.getElementById('themeBtn');
 
-      if (isDarkMode) {
-        mapContainer.classList.add('dark-map');
-        mapContainer.style.background = '#0a0a12';
-        btn.textContent = '☀️';
-        showToast('🟡 Modo Pac-Man Activado', true);
-      } else {
-        mapContainer.classList.remove('dark-map');
+      // Remover clases anteriores de capas de mapa
+      mapContainer.classList.remove('dark-map', 'pacman-map');
+
+      if (theme === 'light') {
+        if (tileLayer) map.removeLayer(tileLayer);
+        tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19, subdomains: 'abcd'
+        }).addTo(map);
         mapContainer.style.background = '#ffffff';
-        btn.textContent = '🟡';
-        showToast('☀️ Modo Claro Activado', true);
+        themeBtn.textContent = '☀️';
+        themeBtn.title = 'Modo Claro Activo';
+        if (showToastMsg) showToast('☀️ Modo Claro Activado', true);
+
+      } else if (theme === 'dark') {
+        if (tileLayer) map.removeLayer(tileLayer);
+        tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19, subdomains: 'abcd'
+        }).addTo(map);
+        mapContainer.style.background = '#0d1117';
+        themeBtn.textContent = '🌙';
+        themeBtn.title = 'Modo Oscuro Activo';
+        if (showToastMsg) showToast('🌙 Modo Oscuro Activado', true);
+
+      } else if (theme === 'pacman') {
+        if (tileLayer) map.removeLayer(tileLayer);
+        // Usamos dark_all con filtro arcade para el laberinto
+        tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19, subdomains: 'abcd'
+        }).addTo(map);
+        mapContainer.classList.add('pacman-map');
+        mapContainer.style.background = '#000000';
+        themeBtn.textContent = '🟡';
+        themeBtn.title = 'Modo Pac-Man Activo';
+        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Fantasmas = Controles, Pelotitas = Camino)', true);
       }
+
+      updateUserMarker();
+      updateAllIncidentMarkers();
+      if (currentRoute) drawRoute(currentRoute.coords, false);
       saveState();
     }
 
@@ -472,16 +514,36 @@
 
     function updateUserMarker() {
       if (!userPos) return;
+      
+      // En modo Pac-Man, el usuario es el círculo amarillo 🟡 (Pac-Man)
+      const markerHtml = currentTheme === 'pacman' 
+        ? '<div style="font-size:26px; filter: drop-shadow(0 0 12px #ffb800); text-align:center;">🟡</div>'
+        : '<div style="width:24px;height:24px;background:#ffb800;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #ffb800;"></div>';
+
       if (!userMarker) {
         userMarker = L.marker(userPos, {
           icon: L.divIcon({
-            html: '<div style="width:24px;height:24px;background:#ffb800;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #ffb800;"></div>',
-            iconSize: [24, 24], iconAnchor: [12, 12]
+            html: markerHtml,
+            iconSize: [28, 28], iconAnchor: [14, 14]
           })
         }).addTo(map);
       } else {
         userMarker.setLatLng(userPos);
+        userMarker.setIcon(L.divIcon({
+          html: markerHtml,
+          iconSize: [28, 28], iconAnchor: [14, 14]
+        }));
       }
+    }
+
+    function updateAllIncidentMarkers() {
+      activeIncidents.forEach(inc => {
+        const emoji = currentTheme === 'pacman' ? '👻' : inc.label.split(' ')[0];
+        inc.marker.setIcon(L.divIcon({
+          html: `<div class="draggable-marker">${emoji}</div>`,
+          iconSize: [38, 38], iconAnchor: [19, 19]
+        }));
+      });
     }
 
     function enableSetOriginMode() {
@@ -595,6 +657,7 @@
     }
 
     function closeAllMenus() {
+      document.getElementById('themeOptions').classList.remove('active');
       document.getElementById('clearOptions').classList.remove('active');
       document.getElementById('hornOptions').classList.remove('active');
       document.getElementById('alertOptions').classList.remove('active');
@@ -605,13 +668,15 @@
       const centerPos = map.getCenter();
       createIncidentMarker(centerPos.lat, centerPos.lng, type, label, Date.now());
       saveState();
-      showToast(`Atención: Alerta de ${label} reportada`, true);
+      const alertName = currentTheme === 'pacman' ? 'Fantasma 👻' : label;
+      showToast(`Atención: Alerta de ${alertName} reportada`, true);
       recalculateSmartRoute();
     }
 
     function createIncidentMarker(lat, lng, type, label, id) {
       const latlng = [lat, lng];
-      const emoji = label.split(' ')[0];
+      // En modo Pac-Man, los controles son fantasmas 👻
+      const emoji = currentTheme === 'pacman' ? '👻' : label.split(' ')[0];
       
       const incidentMarker = L.marker(latlng, {
         draggable: true,
@@ -802,13 +867,37 @@
       if (!isDetour && routeLayerGroup) map.removeLayer(routeLayerGroup);
 
       const group = L.layerGroup();
-      const mainColor = isDetour ? '#ff007f' : '#ffb800'; // Amarillo Pac-Man para la ruta principal
-      const coreColor = isDetour ? '#ffb3d9' : '#ffffff';
+      
+      // EN MODO PACMAN: El camino se dibuja como pelotitas ··· (línea punteada)
+      let mainColor = isDetour ? '#ff007f' : '#ffb800';
+      let dashOption = null;
 
-      const glowLine = L.polyline(coords, { color: mainColor, weight: isDetour ? 12 : 14, opacity: 0.45, lineCap: 'round', lineJoin: 'round' });
-      const coreLine = L.polyline(coords, { color: coreColor, weight: isDetour ? 5 : 6, opacity: 1, lineCap: 'round', lineJoin: 'round' });
+      if (currentTheme === 'pacman') {
+        mainColor = isDetour ? '#ff007f' : '#ffb800';
+        dashOption = '3, 16'; // Simula las pelotitas del camino Pac-Man
+      }
 
-      group.addLayer(glowLine); group.addLayer(coreLine); group.addTo(map);
+      const glowLine = L.polyline(coords, { 
+        color: mainColor, 
+        weight: isDetour ? 10 : 12, 
+        opacity: 0.4, 
+        lineCap: 'round', 
+        lineJoin: 'round',
+        dashArray: dashOption 
+      });
+      
+      const coreLine = L.polyline(coords, { 
+        color: currentTheme === 'pacman' ? '#ffb800' : '#ffffff', 
+        weight: isDetour ? 4 : 5, 
+        opacity: 1, 
+        lineCap: 'round', 
+        lineJoin: 'round',
+        dashArray: dashOption 
+      });
+
+      group.addLayer(glowLine); 
+      group.addLayer(coreLine); 
+      group.addTo(map);
 
       if (isDetour) detourLayerGroup = group;
       else routeLayerGroup = group;
