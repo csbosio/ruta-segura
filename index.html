@@ -164,13 +164,8 @@
     .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; }
     .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; }
 
-    .toast {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      background: rgba(8, 12, 24, 0.95); color: #ffb800; padding: 14px 24px;
-      border-radius: 12px; font-size: 16px; font-weight: 700; z-index: 3000; display: none;
-      border: 1px solid #ffb800; text-align: center;
-    }
-    .toast.show { display: block; }
+    /* Toast desactivado visualmente */
+    .toast { display: none !important; }
   </style>
 </head>
 <body>
@@ -980,12 +975,9 @@
       showToast('Viaje finalizado', true);
     }
 
+    // CARTEL VISUAL (TOAST) DESACTIVADO POR COMPLETO
     function showToast(msg, speakIt = false) {
-      const toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.classList.add('show');
       if (speakIt) speak(msg);
-      setTimeout(() => { toast.classList.remove('show'); }, 3000);
     }
   </script>
 </body>
