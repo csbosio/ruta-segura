@@ -621,7 +621,6 @@
       debounceTimer = setTimeout(async () => {
         let cleanQuery = query.trim();
         
-        // Generar variantes de búsqueda para intersecciones en Córdoba ('y' y '&')
         let queriesToTry = [
           cleanQuery + ', Córdoba, Argentina',
           cleanQuery.replace(/\s+&\s+/gi, ' y ') + ', Córdoba, Argentina',
@@ -797,200 +796,60 @@
 
     function isRouteSafe(coords) {
       if (activeIncidents.length === 0) return true;
-      return coords.every(coord => {
-        return activeIncidents.every(incident => {
-          return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
-        });
-      });
+      for (let coord of coords) {
+        for (let inc of activeIncidents) {
+          const dist = map.distance(coord, inc.pos);
+          if (dist < SAFETY_BUFFER_METERS) return false;
+        }
+      }
+      return true;
     }
 
     async function recalculateSmartRoute() {
       if (!userPos || !destPos) return;
+      const routes = await fetchOSRM([userPos, destPos]);
+      if (routes.length === 0) return;
 
-      const directRoutes = await fetchOSRM([userPos, destPos]);
-      if (directRoutes.length === 0) return;
-
-      currentRoute = directRoutes[0];
-      drawRoute(currentRoute.coords, false);
-      updateNavInfo(currentRoute);
-
-      if (activeIncidents.length === 0 || isRouteSafe(currentRoute.coords)) {
-        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
-        document.getElementById('btnDetour').style.display = 'none';
-        document.getElementById('btnNextDetour').style.display = 'none';
-        availableDetours = [];
-        return;
-      }
-
-      let validCandidates = [];
-
-      for (let r of directRoutes) {
-        if (isRouteSafe(r.coords)) {
-          validCandidates.push(r);
-        }
-      }
-
-      if (validCandidates.length === 0) {
-        validCandidates = await findBypassRoutes([0.002, -0.002, 0.004, -0.004]);
-      }
-
-      if (validCandidates.length === 0) {
-        validCandidates = await findBypassRoutes([0.008, -0.008, 0.012, -0.012, 0.016, -0.016]);
-      }
-
-      if (validCandidates.length > 0) {
-        validCandidates.sort((a, b) => a.distance - b.distance);
-        availableDetours = validCandidates;
-        currentDetourIndex = 0;
-
-        renderCurrentDetour();
-        document.getElementById('btnDetour').style.display = 'block';
-        document.getElementById('btnNextDetour').style.display = availableDetours.length > 1 ? 'block' : 'none';
-
-        showToast(`Atención: ${availableDetours.length} atajo(s) despejado(s) hallados`, true);
+      let safeRoute = routes.find(r => isRouteSafe(r.coords));
+      if (safeRoute) {
+        currentRoute = safeRoute;
+        drawRoute(currentRoute.coords, false);
       } else {
-        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
-        document.getElementById('btnDetour').style.display = 'none';
-        document.getElementById('btnNextDetour').style.display = 'none';
-        availableDetours = [];
-        showToast('Precaución: No hay rutas completamente despejadas', true);
+        currentRoute = routes[0];
+        drawRoute(currentRoute.coords, false);
       }
-    }
-
-    async function findBypassRoutes(offsets) {
-      let promises = [];
-      for (let incident of activeIncidents) {
-        const cLat = incident.pos[0];
-        const cLng = incident.pos[1];
-        for (let latOff of offsets) {
-          for (let lngOff of offsets) {
-            const bypass = [cLat + latOff, cLng + lngOff];
-            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
-              promises.push(fetchOSRM([userPos, bypass, destPos]));
-            }
-          }
-        }
-      }
-
-      const resultsArray = await Promise.all(promises);
-      let candidates = [];
-
-      resultsArray.forEach(routes => {
-        routes.forEach(tRoute => {
-          if (isRouteSafe(tRoute.coords)) {
-            if (!candidates.some(r => Math.abs(r.distance - tRoute.distance) < 40)) {
-              candidates.push(tRoute);
-            }
-          }
-        });
-      });
-
-      return candidates;
-    }
-
-    function renderCurrentDetour() {
-      if (availableDetours.length === 0) return;
-      detourRoute = availableDetours[currentDetourIndex];
-      drawRoute(detourRoute.coords, true);
-    }
-
-    function cycleNextDetour() {
-      if (availableDetours.length <= 1) return;
-      currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
-      renderCurrentDetour();
-      showToast(`Atajo alternativo ${currentDetourIndex + 1}`, true);
-    }
-
-    function getDistanceMeters(p1, p2) {
-      const R = 6371000;
-      const dLat = (p2[0] - p1[0]) * Math.PI / 180;
-      const dLon = (p2[1] - p1[1]) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
     function drawRoute(coords, isDetour) {
-      if (isDetour && detourLayerGroup) map.removeLayer(detourLayerGroup);
-      if (!isDetour && routeLayerGroup) map.removeLayer(routeLayerGroup);
-
-      const group = L.layerGroup();
-      
-      let mainColor = isDetour ? '#ff007f' : '#ffb800';
-      let dashOption = null;
-
-      if (currentTheme === 'pacman') {
-        mainColor = isDetour ? '#ff007f' : '#ffb800';
-        dashOption = '3, 16';
+      if (isDetour) {
+        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
+        detourLayerGroup = L.polyline(coords, { color: '#ffb700', weight: 5, dashArray: '10, 10' }).addTo(map);
+      } else {
+        if (routeLayerGroup) map.removeLayer(routeLayerGroup);
+        routeLayerGroup = L.polyline(coords, { color: '#00f3ff', weight: 6, opacity: 0.8 }).addTo(map);
+        document.getElementById('navPanel').style.display = 'block';
+        document.getElementById('navDistance').textContent = (currentRoute.distance / 1000).toFixed(1) + ' km';
+        document.getElementById('navStreet').textContent = 'Ruta calculada correctamente';
       }
-
-      const glowLine = L.polyline(coords, { 
-        color: mainColor, 
-        weight: isDetour ? 10 : 12, 
-        opacity: 0.4, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        dashArray: dashOption 
-      });
-      
-      const coreLine = L.polyline(coords, { 
-        color: currentTheme === 'pacman' ? '#ffb800' : '#ffffff', 
-        weight: isDetour ? 4 : 5, 
-        opacity: 1, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        dashArray: dashOption 
-      });
-
-      group.addLayer(glowLine); 
-      group.addLayer(coreLine); 
-      group.addTo(map);
-
-      if (isDetour) detourLayerGroup = group;
-      else routeLayerGroup = group;
     }
 
-    function updateNavInfo(routeData) {
-      document.getElementById('navPanel').style.display = 'flex';
-      document.getElementById('btnStart').style.display = 'block';
-      const distKm = (routeData.distance / 1000).toFixed(1);
-      document.getElementById('navDistance').textContent = `${distKm} km`;
-      document.getElementById('navStreet').textContent = 'RUTA CALCULADA';
-    }
-
-    function activateDetour() {
-      if (!detourRoute) return;
-      drawRoute(detourRoute.coords, false);
-      if (detourLayerGroup) map.removeLayer(detourLayerGroup);
-      currentRoute = detourRoute;
-      document.getElementById('btnDetour').style.display = 'none';
-      document.getElementById('btnNextDetour').style.display = 'none';
-      showToast('Navegando por el atajo', true);
+    function showToast(text, speakText = false) {
+      console.log(text);
+      if (speakText) speak(text);
     }
 
     function startNavigation() {
       isNavigating = true;
       document.getElementById('btnStart').style.display = 'none';
-      document.getElementById('btnDetour').style.display = 'none';
-      document.getElementById('btnNextDetour').style.display = 'none';
       document.getElementById('btnStop').style.display = 'block';
-      document.getElementById('navStreet').textContent = 'NAVEGANDO...';
-      document.getElementById('navDetail').textContent = 'Seguimiento de GPS en vivo activo';
-      showToast('Viaje iniciado. GPS en tiempo real activado', true);
+      showToast('Navegación iniciada', true);
     }
 
     function stopNavigation() {
       isNavigating = false;
+      document.getElementById('btnStart').style.display = 'flex';
       document.getElementById('btnStop').style.display = 'none';
-      document.getElementById('btnStart').style.display = 'block';
-      document.getElementById('navStreet').textContent = 'SISTEMA LISTO';
-      document.getElementById('navDetail').textContent = 'Tocá "Iniciar viaje" para comenzar';
-      showToast('Viaje finalizado', true);
-    }
-
-    function showToast(msg, speakIt = false) {
-      if (speakIt) speak(msg);
+      showToast('Navegación finalizada', true);
     }
   </script>
 </body>
