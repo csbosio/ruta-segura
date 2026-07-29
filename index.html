@@ -36,13 +36,11 @@
       transition: background 0.3s ease;
     }
 
-    /* ELIMINA EL CUADRADO BLANCO Y BORDE POR DEFECTO DE LEAFLET EN LOS DIVICONS */
     .leaflet-div-icon {
       background: transparent !important;
       border: none !important;
     }
 
-    /* ESTILOS DE MAPA SEGÚN MODO */
     .leaflet-container.dark-map .leaflet-tile-pane {
       filter: brightness(85%) contrast(115%);
     }
@@ -142,7 +140,6 @@
     }
     .menu-item-danger { border-color: rgba(255, 51, 0, 0.8); }
 
-    /* MARCADORES LIMPIOS Y FLOTANTES SIN TEXTO */
     .draggable-marker {
       font-size: 28px; 
       background: transparent; 
@@ -164,7 +161,6 @@
     .nav-instruction .street { font-size: 20px; font-weight: 800; color: #ffffff; }
     .nav-instruction .distance { font-size: 32px; font-weight: 800; color: #00f3ff; }
 
-    /* Toast desactivado visualmente */
     .toast { display: none !important; }
   </style>
 </head>
@@ -195,7 +191,6 @@
   <div class="floating-controls overlay">
     <button class="fab-btn fab-gps" onclick="enableSetOriginMode()" title="Fijar Origen Manual">🚗</button>
     
-    <!-- SELECCIÓN DE 3 MODOS: CLARO, OSCURO, PAC-MAN -->
     <div class="bubble-group">
       <div class="menu-options" id="themeOptions">
         <div class="menu-item" onclick="setTheme('light')"><span>☀️</span> Modo Claro</div>
@@ -207,7 +202,6 @@
 
     <button class="fab-btn fab-voice" id="voiceToggleBtn" onclick="toggleVoice()" title="Voz Activada">🔊</button>
 
-    <!-- MENÚ DE LIMPIEZA -->
     <div class="bubble-group">
       <div class="menu-options" id="clearOptions">
         <div class="menu-item" onclick="clearRouteOnly()"><span>🗺️</span> Eliminar Recorrido</div>
@@ -217,7 +211,6 @@
       <button class="fab-btn fab-clear" onclick="toggleMenu('clearOptions')" title="Limpiar Mapa">🗑️</button>
     </div>
 
-    <!-- Controles -->
     <div class="bubble-group">
       <div class="menu-options" id="hornOptions">
         <div class="menu-item" onclick="reportIncident('control_municipal', 'Control Municipal')"><span>🏛️</span> Control Municipal</div>
@@ -229,7 +222,6 @@
       <button class="fab-btn fab-horn" onclick="toggleMenu('hornOptions')">📢</button>
     </div>
 
-    <!-- Imprevistos (Alertas) -->
     <div class="bubble-group">
       <div class="menu-options" id="alertOptions">
         <div class="menu-item" onclick="reportIncident('bache', 'Bache peligroso')"><span>🕳️</span> Bache</div>
@@ -263,7 +255,6 @@
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
     const DEFAULT_ORIGIN = [-31.4201, -64.1888];
 
-    // MAPEO ESTRICTO DE EMOJIS/SÍMBOLOS (SIN LETRAS)
     const incidentEmojis = {
       'control_municipal': '🏛️',
       'itv': '🔍',
@@ -444,7 +435,7 @@
         mapContainer.style.background = '#000000';
         themeBtn.textContent = '🟡';
         themeBtn.title = 'Modo Pac-Man Activo';
-        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Pac-Man real y Fantasmas clásicos)', true);
+        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Baches con 💩 y Fantasmas clásicos)', true);
       }
 
       updateUserMarker();
@@ -552,13 +543,16 @@
     }
 
     function getGhostSvgHtml(type) {
+      // Si es reporte de bache o imprevistos de calle, mostramos la kakita de WhatsApp 💩 en modo Pac-Man
+      if (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') {
+        return `<div style="font-size:32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent; text-align:center;">💩</div>`;
+      }
+
       let color = '#ff0000'; // Rojo (Blinky por defecto)
       if (type === 'itv') color = '#00f3ff'; // Celeste (Inky)
       else if (type === 'radar') color = '#ffb800'; // Naranja (Clyde)
-      else if (type === 'itv_radar' || type === 'manifestacion') color = '#ff77ff'; // Rosado (Pinky)
+      else if (type === 'itv_radar') color = '#ff77ff'; // Rosado (Pinky)
       else if (type === 'control_transito') color = '#ff0000'; // Rojo
-      else if (type === 'bache') color = '#9900ff'; // Violeta
-      else if (type.includes('corte')) color = '#00ff66'; // Verde
 
       return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">
         <path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/>
@@ -702,7 +696,7 @@
       const centerPos = map.getCenter();
       createIncidentMarker(centerPos.lat, centerPos.lng, type, label, Date.now());
       saveState();
-      const alertName = currentTheme === 'pacman' ? 'Fantasma 👻' : label;
+      const alertName = currentTheme === 'pacman' && (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') ? 'Bache 💩' : label;
       showToast(`Atención: Alerta de ${alertName} reportada`, true);
       recalculateSmartRoute();
     }
@@ -975,7 +969,6 @@
       showToast('Viaje finalizado', true);
     }
 
-    // CARTEL VISUAL (TOAST) DESACTIVADO POR COMPLETO
     function showToast(msg, speakIt = false) {
       if (speakIt) speak(msg);
     }
