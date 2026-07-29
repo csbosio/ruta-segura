@@ -36,6 +36,12 @@
       transition: background 0.3s ease;
     }
 
+    /* ELIMINA EL CUADRADO BLANCO Y BORDE POR DEFECTO DE LEAFLET EN LOS DIVICONS */
+    .leaflet-div-icon {
+      background: transparent !important;
+      border: none !important;
+    }
+
     /* ESTILOS DE MAPA SEGÚN MODO */
     .leaflet-container.dark-map .leaflet-tile-pane {
       filter: brightness(85%) contrast(115%);
@@ -340,7 +346,7 @@
         }
         if (destMarker) map.removeLayer(destMarker);
         destMarker = L.marker(destPos, {
-          icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+          icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
         }).addTo(map);
       }
 
@@ -525,9 +531,8 @@
     function updateUserMarker() {
       if (!userPos) return;
       
-      // PAC-MAN VECTORIAL REAL CON BOCA CORTADA EN MODO PACMAN, SINO PUNTO DORADO/BLANCO
       const markerHtml = currentTheme === 'pacman' 
-        ? `<div style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9)); text-align:center;">
+        ? `<div style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9)); text-align:center; background: transparent;">
              <svg width="36" height="36" viewBox="0 0 100 100">
                <path d="M 50 50 L 92 22 A 50 50 0 1 0 92 78 Z" fill="#ffeb00"/>
                <circle cx="50" cy="28" r="6" fill="#000"/>
@@ -560,7 +565,7 @@
       else if (type === 'bache') color = '#9900ff'; // Violeta
       else if (type.includes('corte')) color = '#00ff66'; // Verde
 
-      return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">
+      return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">
         <path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/>
         <circle cx="8.5" cy="9.5" r="2" fill="#fff"/><circle cx="9" cy="9.5" r="1" fill="#000"/>
         <circle cx="15.5" cy="9.5" r="2" fill="#fff"/><circle cx="16" cy="9.5" r="1" fill="#000"/>
@@ -600,7 +605,7 @@
       destPos = [latlng.lat, latlng.lng];
       if (destMarker) map.removeLayer(destMarker);
       destMarker = L.marker(destPos, {
-        icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+        icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
       }).addTo(map);
 
       try {
@@ -648,7 +653,7 @@
                   document.getElementById('destInput').value = place.display_name.split(',')[0];
                   if (destMarker) map.removeLayer(destMarker);
                   destMarker = L.marker(destPos, {
-                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                   }).addTo(map);
                   saveState();
                 }
