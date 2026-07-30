@@ -622,12 +622,10 @@
         let cleanQuery = query.trim();
         let parts = cleanQuery.split(/\s+(?:y|&|,)\s+/i);
 
-        // Si el usuario escribió dos calles (ej: colon y sucre)
         if (parts.length >= 2) {
           let calle1 = parts[0].trim();
           let calle2 = parts[1].trim();
 
-          // Consulta Overpass Turbo para buscar nodos donde se cruzan exactamente dos calles en Córdoba
           let overpassQuery = `
             [out:json][timeout:5];
             area[name="Córdoba"]["admin_level"="8"]->.searchArea;
@@ -648,7 +646,6 @@
             if (data && data.elements && data.elements.length > 0) {
               suggBox.innerHTML = '<div style="padding:6px 10px; font-size:12px; color:#00ff66; background:rgba(0,0,0,0.8); font-weight:700;">Esquinas exactas encontradas:</div>';
               
-              // Tomamos hasta 5 cruces encontrados
               data.elements.slice(0, 5).forEach((node, index) => {
                 const latlng = [node.lat, node.lon];
                 const item = document.createElement('div');
@@ -683,7 +680,6 @@
           }
         }
 
-        // Respaldo clásico de Nominatim si es una sola calle o no encontró cruce exacto
         let url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(cleanQuery + ', Córdoba, Argentina')}&countrycodes=ar&limit=4`;
         try {
           const res = await fetch(url);
@@ -761,11 +757,12 @@
 
     function reportIncident(type, label) {
       closeAllMenus();
-      const centerPos = map.getCenter();
-      createIncidentMarker(centerPos.lat, centerPos.lng, type, label, Date.now());
+      // Se fija automáticamente en la ubicación actual del usuario (GPS o posición por defecto)
+      const targetPos = userPos ? userPos : DEFAULT_ORIGIN;
+      createIncidentMarker(targetPos[0], targetPos[1], type, label, Date.now());
       saveState();
       const alertName = currentTheme === 'pacman' && (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') ? 'Bache 💩' : label;
-      showToast(`Atención: Alerta de ${alertName} reportada`, true);
+      showToast(`Atención: Alerta de ${alertName} reportada en tu ubicación actual (puedes moverla si deseas)`, true);
       recalculateSmartRoute();
     }
 
@@ -788,7 +785,7 @@
 
       const popupContent = document.createElement('div');
       popupContent.style.textAlign = 'center';
-      popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div>`;
+      popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div><div style="font-size:11px; color:#aaa; margin-top:2px;">(Arrastrable para ajustar)</div>`;
       
       const deleteBtn = document.createElement('button');
       deleteBtn.style.cssText = 'background:#ff0055; color:#fff; border:none; padding:8px 12px; border-radius:8px; width:100%; margin-top:6px; cursor:pointer; font-weight:800;';
@@ -843,10 +840,19 @@
 
     const SAFETY_BUFFER_METERS = 100;
 
+    // Modificación: Solo se consideran bloqueantes u obligatorias de desvío las alertas graves (controles, radares, cortes totales, etc.), excluyendo baches y cortes de media calzada.
+    function isIncidentBlocking(type) {
+      if (type === 'bache' || type === 'corte_parcial') {
+        return false;
+      }
+      return true;
+    }
+
     function isRouteSafe(coords) {
       if (activeIncidents.length === 0) return true;
       return coords.every(coord => {
         return activeIncidents.every(incident => {
+          if (!isIncidentBlocking(incident.type)) return true; // Si es bache o media calzada, no bloquea el paso de la ruta
           return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
         });
       });
@@ -908,12 +914,13 @@
     async function findBypassRoutes(offsets) {
       let promises = [];
       for (let incident of activeIncidents) {
+        if (!isIncidentBlocking(incident.type)) continue;
         const cLat = incident.pos[0];
         const cLng = incident.pos[1];
         for (let latOff of offsets) {
           for (let lngOff of offsets) {
             const bypass = [cLat + latOff, cLng + lngOff];
-            if (activeIncidents.every(inc => getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
+            if (activeIncidents.every(inc => !isIncidentBlocking(inc.type) || getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
               promises.push(fetchOSRM([userPos, bypass, destPos]));
             }
           }
