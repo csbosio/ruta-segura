@@ -615,103 +615,115 @@
         return; 
       }
 
-      suggBox.innerHTML = '<div class="suggestion-item" style="color:rgba(0,243,255,0.7);">Buscando en Córdoba...</div>';
+      suggBox.innerHTML = '<div class="suggestion-item" style="color:rgba(0,243,255,0.7);">Buscando esquina en Córdoba...</div>';
       suggBox.style.display = 'block';
 
       debounceTimer = setTimeout(async () => {
         let cleanQuery = query.trim();
-        
-        // Generar variantes inteligentes para esquinas en Córdoba
-        let queriesToTry = [
-          cleanQuery + ', Córdoba, Argentina',
-          cleanQuery.replace(/\s+y\s+/gi, ' & ') + ', Córdoba, Argentina',
-          cleanQuery.replace(/\s+&\s+/gi, ' y ') + ', Córdoba, Argentina'
-        ];
+        let parts = cleanQuery.split(/\s+(?:y|&|,)\s+/i);
 
-        const parts = cleanQuery.split(/\s+(?:y|&)\s+/i);
-        if (parts.length === 2) {
-          queriesToTry.push(`${parts[1]} y ${parts[0]}, Córdoba, Argentina`);
-        }
+        // Si el usuario escribió dos calles (ej: colon y sucre)
+        if (parts.length >= 2) {
+          let calle1 = parts[0].trim();
+          let calle2 = parts[1].trim();
 
-        queriesToTry = [...new Set(queriesToTry)];
-        let foundPlaces = [];
+          // Consulta Overpass Turbo para buscar nodos donde se cruzan exactamente dos calles en Córdoba
+          let overpassQuery = `
+            [out:json][timeout:5];
+            area[name="Córdoba"]["admin_level"="8"]->.searchArea;
+            way[highway](area.searchArea)[name~"${calle1}", i]->.w1;
+            way[highway](area.searchArea)[name~"${calle2}", i]->.w2;
+            node.w1(w.w2);
+            out body;
+          `;
 
-        for (let q of queriesToTry) {
-          const url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(q)}&countrycodes=ar&limit=5`;
           try {
-            const res = await fetch(url);
-            const data = await res.json();
-            if (data && data.length > 0) {
-              foundPlaces = data;
-              break;
-            }
-          } catch (e) {}
-        }
+            let response = await fetch('https://overpass-api.de/api/interpreter', {
+              method: 'POST',
+              body: overpassQuery
+            });
+            let data = await response.json();
 
-        suggBox.innerHTML = '';
-        if (foundPlaces.length > 0) {
-          foundPlaces.forEach(place => {
-            const item = document.createElement('div');
-            item.className = 'suggestion-item';
-            item.textContent = place.display_name;
-            item.onclick = () => {
-              const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
-              if (activeInputTarget === 'origin') {
-                userPos = latlng;
-                document.getElementById('originInput').value = place.display_name.split(',')[0];
-                updateUserMarker();
-              } else {
-                destPos = latlng;
-                document.getElementById('destInput').value = place.display_name.split(',')[0];
-                if (destMarker) map.removeLayer(destMarker);
-                destMarker = L.marker(destPos, {
-                  icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
-                }).addTo(map);
-                saveState();
-              }
-              suggBox.style.display = 'none';
-              map.setView(latlng, 15);
-              if (userPos && destPos) recalculateSmartRoute();
-            };
-            suggBox.appendChild(item);
-          });
-          suggBox.style.display = 'block';
-        } else {
-          if (parts.length > 0 && parts[0].length > 2) {
-            try {
-              const fallbackUrl = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(parts[0] + ', Córdoba, Argentina')}&countrycodes=ar&limit=3`;
-              const fbRes = await fetch(fallbackUrl);
-              const fbData = await fbRes.json();
-              if (fbData && fbData.length > 0) {
-                suggBox.innerHTML = '<div style="padding:8px; font-size:12px; color:#ffb800; background:rgba(0,0,0,0.8);">Esquina exacta no hallada. ¿Querés elegir esta aproximación?:</div>';
-                fbData.forEach(place => {
-                  const item = document.createElement('div');
-                  item.className = 'suggestion-item';
-                  item.textContent = place.display_name;
-                  item.onclick = () => {
-                    const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
+            suggBox.innerHTML = '';
+            if (data && data.elements && data.elements.length > 0) {
+              suggBox.innerHTML = '<div style="padding:6px 10px; font-size:12px; color:#00ff66; background:rgba(0,0,0,0.8); font-weight:700;">Esquinas exactas encontradas:</div>';
+              
+              // Tomamos hasta 5 cruces encontrados
+              data.elements.slice(0, 5).forEach((node, index) => {
+                const latlng = [node.lat, node.lon];
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = `Cruce #${index + 1} (${calle1} & ${calle2})`;
+                
+                item.onclick = () => {
+                  if (activeInputTarget === 'origin') {
+                    userPos = latlng;
+                    document.getElementById('originInput').value = `${calle1} y ${calle2}`;
+                    updateUserMarker();
+                  } else {
                     destPos = latlng;
-                    document.getElementById('destInput').value = place.display_name.split(',')[0];
+                    document.getElementById('destInput').value = `${calle1} y ${calle2}`;
                     if (destMarker) map.removeLayer(destMarker);
                     destMarker = L.marker(destPos, {
                       icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
                     }).addTo(map);
                     saveState();
-                    suggBox.style.display = 'none';
-                    map.setView(latlng, 15);
-                    if (userPos && destPos) recalculateSmartRoute();
-                  };
-                  suggBox.appendChild(item);
-                });
-                suggBox.style.display = 'block';
-                return;
-              }
-            } catch(e){}
+                  }
+                  suggBox.style.display = 'none';
+                  map.setView(latlng, 17);
+                  if (userPos && destPos) recalculateSmartRoute();
+                };
+                suggBox.appendChild(item);
+              });
+              suggBox.style.display = 'block';
+              return;
+            }
+          } catch (err) {
+            console.warn('Error en Overpass, usando respaldo Nominatim', err);
           }
-          suggBox.innerHTML = '<div class="suggestion-item" style="color:#ff0055;">No se encontró la esquina. Probá tocando directamente en el mapa.</div>';
-          suggBox.style.display = 'block';
         }
-      }, 300);
+
+        // Respaldo clásico de Nominatim si es una sola calle o no encontró cruce exacto
+        let url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(cleanQuery + ', Córdoba, Argentina')}&countrycodes=ar&limit=4`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          suggBox.innerHTML = '';
+          if (data && data.length > 0) {
+            data.forEach(place => {
+              const item = document.createElement('div');
+              item.className = 'suggestion-item';
+              item.textContent = place.display_name;
+              item.onclick = () => {
+                const latlng = [parseFloat(place.lat), parseFloat(place.lon)];
+                if (activeInputTarget === 'origin') {
+                  userPos = latlng;
+                  document.getElementById('originInput').value = place.display_name.split(',')[0];
+                  updateUserMarker();
+                } else {
+                  destPos = latlng;
+                  document.getElementById('destInput').value = place.display_name.split(',')[0];
+                  if (destMarker) map.removeLayer(destMarker);
+                  destMarker = L.marker(destPos, {
+                    icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
+                  }).addTo(map);
+                  saveState();
+                }
+                suggBox.style.display = 'none';
+                map.setView(latlng, 15);
+                if (userPos && destPos) recalculateSmartRoute();
+              };
+              suggBox.appendChild(item);
+            });
+            suggBox.style.display = 'block';
+          } else {
+            suggBox.innerHTML = '<div class="suggestion-item" style="color:#ff0055;">No se encontró. Tocá el punto exacto en el mapa.</div>';
+            suggBox.style.display = 'block';
+          }
+        } catch (e) {
+          suggBox.style.display = 'none';
+        }
+      }, 400);
     }
 
     function clearOrigin() {
