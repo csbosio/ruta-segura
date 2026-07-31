@@ -107,6 +107,7 @@
     .btn-danger { background: #ff0055; color: #fff; box-shadow: 0 0 20px rgba(255, 0, 85, 0.6); }
     .btn-warning { background: #ffb700; color: #000; box-shadow: 0 0 20px rgba(255, 183, 0, 0.6); }
     .btn-success { background: #00ff66; color: #02040a; box-shadow: 0 0 20px rgba(0, 255, 102, 0.6); }
+    .btn-uber { background: #000000; color: #ffffff; border: 2px solid #ffffff; box-shadow: 0 0 20px rgba(255, 255, 255, 0.4); }
 
     /* Controles Flotantes */
     .floating-controls {
@@ -172,12 +173,12 @@
     <div class="search-box">
       <div class="input-row">
         <button class="icon-btn" onclick="startLiveGPS()" title="GPS Activo">📍</button>
-        <input type="text" id="originInput" placeholder="ORIGEN: GPS vivo o esquina (ej: Colón & General Paz)..." oninput="handleSearchInput(this.value, 'origin')">
+        <input type="text" id="originInput" placeholder="ORIGEN: GPS vivo o esquina..." oninput="handleSearchInput(this.value, 'origin')">
         <button class="icon-btn" onclick="clearOrigin()" title="Restaurar GPS">🔄</button>
       </div>
       <div class="input-row">
         <span style="font-size:16px; padding:0 6px;">🏁</span>
-        <input type="text" id="destInput" placeholder="DESTINO: escribí esquina (ej: Revolucion de Mayo y Madrid)..." oninput="handleSearchInput(this.value, 'dest')">
+        <input type="text" id="destInput" placeholder="DESTINO: escribí esquina..." oninput="handleSearchInput(this.value, 'dest')">
         <button class="icon-btn" onclick="clearDestination()">❌</button>
       </div>
       <div id="suggestions" class="suggestions-list"></div>
@@ -240,11 +241,12 @@
       <div class="street" id="navStreet">SISTEMA LISTO</div>
       <div class="detail" id="navDetail" style="color:rgba(0, 243, 255, 0.75); font-size:14px; font-weight: 600;">Tocá "Iniciar viaje" para comenzar</div>
     </div>
-    <div style="display:flex; gap:10px;">
-      <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar viaje</button>
-      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Aplicar Desvío</button>
+    <div style="display:flex; gap:10px; flex-wrap: wrap;">
+      <button class="btn btn-success" id="btnStart" style="flex:1;" onclick="startNavigation()">▶️ Iniciar</button>
+      <button class="btn btn-uber" id="btnUber" style="flex:1;" onclick="openUberWithDestination()">🚙 Pedir Uber</button>
+      <button class="btn btn-warning" id="btnDetour" style="display:none; flex:1;" onclick="activateDetour()">🔄 Desvío</button>
       <button class="btn btn-primary" id="btnNextDetour" style="display:none; flex:0.6;" onclick="cycleNextDetour()">🔀 Atajo</button>
-      <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Finalizar</button>
+      <button class="btn btn-danger" id="btnStop" style="display:none; flex:1;" onclick="stopNavigation()">⏹️ Fin</button>
     </div>
   </div>
 
@@ -435,7 +437,7 @@
         mapContainer.style.background = '#000000';
         themeBtn.textContent = '🟡';
         themeBtn.title = 'Modo Pac-Man Activo';
-        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado! (Baches con 💩 y Fantasmas clásicos)', true);
+        if (showToastMsg) showToast('🟡 ¡Modo Pac-Man Activado!', true);
       }
 
       updateUserMarker();
@@ -450,11 +452,9 @@
       document.getElementById('destInput').value = '';
       if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
       clearRoutes();
-      if (navigator.geolocation) {
-        startLiveGPS();
-      }
+      if (navigator.geolocation) { startLiveGPS(); }
       saveState();
-      showToast('Recorrido eliminado (GPS conservado)', true);
+      showToast('Recorrido eliminado', true);
     }
 
     function clearIncidentsOnly() {
@@ -465,7 +465,7 @@
       document.getElementById('btnDetour').style.display = 'none';
       document.getElementById('btnNextDetour').style.display = 'none';
       saveState();
-      showToast('Todos los controles eliminados', true);
+      showToast('Controles eliminados', true);
       if (userPos && destPos) recalculateSmartRoute();
     }
 
@@ -473,109 +473,66 @@
       clearRouteOnly();
       clearIncidentsOnly();
       saveState();
-      showToast('Todo fue eliminado del mapa', true);
+      showToast('Todo fue eliminado', true);
     }
 
     function startLiveGPS() {
-      if (!navigator.geolocation) {
-        showToast('Tu navegador no soporta geolocalización', true);
-        return;
-      }
-
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
-      }
-
-      showToast('Radar GPS continuo activo...', false);
+      if (!navigator.geolocation) return;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
       watchId = navigator.geolocation.watchPosition(
         pos => {
           userPos = [pos.coords.latitude, pos.coords.longitude];
           document.getElementById('originInput').value = 'Mi ubicación actual (GPS vivo)';
           updateUserMarker();
-
-          if (isNavigating) {
-            map.setView(userPos, 16, { animate: true });
-          }
+          if (isNavigating) map.setView(userPos, 16, { animate: true });
         },
         err => {
-          console.warn('Error de GPS:', err.message);
           if (!userPos) {
             userPos = DEFAULT_ORIGIN;
-            document.getElementById('originInput').value = 'Córdoba Centro (Predeterminado)';
+            document.getElementById('originInput').value = 'Córdoba Centro';
             updateUserMarker();
           }
         },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 10000
-        }
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
       );
     }
 
     function updateUserMarker() {
       if (!userPos) return;
-      
       const markerHtml = currentTheme === 'pacman' 
-        ? `<div style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9)); text-align:center; background: transparent;">
-             <svg width="36" height="36" viewBox="0 0 100 100">
-               <path d="M 50 50 L 92 22 A 50 50 0 1 0 92 78 Z" fill="#ffeb00"/>
-               <circle cx="50" cy="28" r="6" fill="#000"/>
-             </svg>
-           </div>`
+        ? `<div style="filter: drop-shadow(0 2px 5px rgba(0,0,0,0.9)); text-align:center; background: transparent;"><svg width="36" height="36" viewBox="0 0 100 100"><path d="M 50 50 L 92 22 A 50 50 0 1 0 92 78 Z" fill="#ffeb00"/><circle cx="50" cy="28" r="6" fill="#000"/></svg></div>`
         : '<div style="width:24px;height:24px;background:#ffb800;border-radius:50%;border:3px solid #fff;box-shadow:0 0 20px #ffb800;"></div>';
 
       if (!userMarker) {
-        userMarker = L.marker(userPos, {
-          icon: L.divIcon({
-            html: markerHtml,
-            iconSize: [36, 36], iconAnchor: [18, 18]
-          })
-        }).addTo(map);
+        userMarker = L.marker(userPos, { icon: L.divIcon({ html: markerHtml, iconSize: [36, 36], iconAnchor: [18, 18] }) }).addTo(map);
       } else {
         userMarker.setLatLng(userPos);
-        userMarker.setIcon(L.divIcon({
-          html: markerHtml,
-          iconSize: [36, 36], iconAnchor: [18, 18]
-        }));
+        userMarker.setIcon(L.divIcon({ html: markerHtml, iconSize: [36, 36], iconAnchor: [18, 18] }));
       }
     }
 
     function getGhostSvgHtml(type) {
-      if (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') {
+      if (['bache', 'manifestacion', 'corte', 'corte_parcial'].includes(type)) {
         return `<div style="font-size:32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent; text-align:center;">💩</div>`;
       }
-
       let color = '#ff0000';
       if (type === 'itv') color = '#00f3ff';
       else if (type === 'radar') color = '#ffb800';
       else if (type === 'itv_radar') color = '#ff77ff';
-      else if (type === 'control_transito') color = '#ff0000';
-
-      return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">
-        <path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/>
-        <circle cx="8.5" cy="9.5" r="2" fill="#fff"/><circle cx="9" cy="9.5" r="1" fill="#000"/>
-        <circle cx="15.5" cy="9.5" r="2" fill="#fff"/><circle cx="16" cy="9.5" r="1" fill="#000"/>
-      </svg>`;
+      return `<svg width="38" height="38" viewBox="0 0 24 24" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;"><path d="M12 2C7.03 2 3 6.03 3 11v11l2-1.5 2 1.5 2-1.5 2 1.5 2-1.5 2 1.5V11c0-4.97-4.03-9-9-9z" fill="${color}"/><circle cx="8.5" cy="9.5" r="2" fill="#fff"/><circle cx="15.5" cy="9.5" r="2" fill="#fff"/></svg>`;
     }
 
     function updateAllIncidentMarkers() {
       activeIncidents.forEach(inc => {
-        const markerContent = currentTheme === 'pacman' 
-          ? getGhostSvgHtml(inc.type) 
-          : `<div class="draggable-marker">${incidentEmojis[inc.type] || '⚠️'}</div>`;
-
-        inc.marker.setIcon(L.divIcon({
-          html: markerContent,
-          iconSize: [38, 38], iconAnchor: [19, 19]
-        }));
+        const markerContent = currentTheme === 'pacman' ? getGhostSvgHtml(inc.type) : `<div class="draggable-marker">${incidentEmojis[inc.type] || '⚠️'}</div>`;
+        inc.marker.setIcon(L.divIcon({ html: markerContent, iconSize: [38, 38], iconAnchor: [19, 19] }));
       });
     }
 
     function enableSetOriginMode() {
       settingOriginMode = true;
-      showToast('Tocá en el mapa para fijar tu origen manual', true);
+      showToast('Tocá en el mapa para fijar tu origen', true);
     }
 
     async function setOriginFromMap(latlng) {
@@ -610,76 +567,13 @@
       activeInputTarget = target;
       clearTimeout(debounceTimer);
       const suggBox = document.getElementById('suggestions');
-      if (!query || query.trim().length < 2) { 
-        suggBox.style.display = 'none'; 
-        return; 
-      }
+      if (!query || query.trim().length < 2) { suggBox.style.display = 'none'; return; }
 
-      suggBox.innerHTML = '<div class="suggestion-item" style="color:rgba(0,243,255,0.7);">Buscando esquina en Córdoba...</div>';
+      suggBox.innerHTML = '<div class="suggestion-item" style="color:rgba(0,243,255,0.7);">Buscando...</div>';
       suggBox.style.display = 'block';
 
       debounceTimer = setTimeout(async () => {
         let cleanQuery = query.trim();
-        let parts = cleanQuery.split(/\s+(?:y|&|,)\s+/i);
-
-        if (parts.length >= 2) {
-          let calle1 = parts[0].trim();
-          let calle2 = parts[1].trim();
-
-          let overpassQuery = `
-            [out:json][timeout:5];
-            area[name="Córdoba"]["admin_level"="8"]->.searchArea;
-            way[highway](area.searchArea)[name~"${calle1}", i]->.w1;
-            way[highway](area.searchArea)[name~"${calle2}", i]->.w2;
-            node.w1(w.w2);
-            out body;
-          `;
-
-          try {
-            let response = await fetch('https://overpass-api.de/api/interpreter', {
-              method: 'POST',
-              body: overpassQuery
-            });
-            let data = await response.json();
-
-            suggBox.innerHTML = '';
-            if (data && data.elements && data.elements.length > 0) {
-              suggBox.innerHTML = '<div style="padding:6px 10px; font-size:12px; color:#00ff66; background:rgba(0,0,0,0.8); font-weight:700;">Esquinas exactas encontradas:</div>';
-              
-              data.elements.slice(0, 5).forEach((node, index) => {
-                const latlng = [node.lat, node.lon];
-                const item = document.createElement('div');
-                item.className = 'suggestion-item';
-                item.textContent = `Cruce #${index + 1} (${calle1} & ${calle2})`;
-                
-                item.onclick = () => {
-                  if (activeInputTarget === 'origin') {
-                    userPos = latlng;
-                    document.getElementById('originInput').value = `${calle1} y ${calle2}`;
-                    updateUserMarker();
-                  } else {
-                    destPos = latlng;
-                    document.getElementById('destInput').value = `${calle1} y ${calle2}`;
-                    if (destMarker) map.removeLayer(destMarker);
-                    destMarker = L.marker(destPos, {
-                      icon: L.divIcon({ html: '<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9)); background: transparent;">🟡</div>', iconSize: [30, 30], iconAnchor: [15, 30] })
-                    }).addTo(map);
-                    saveState();
-                  }
-                  suggBox.style.display = 'none';
-                  map.setView(latlng, 17);
-                  if (userPos && destPos) recalculateSmartRoute();
-                };
-                suggBox.appendChild(item);
-              });
-              suggBox.style.display = 'block';
-              return;
-            }
-          } catch (err) {
-            console.warn('Error en Overpass, usando respaldo Nominatim', err);
-          }
-        }
-
         let url = `${NOMINATIM_URL}?format=json&q=${encodeURIComponent(cleanQuery + ', Córdoba, Argentina')}&countrycodes=ar&limit=4`;
         try {
           const res = await fetch(url);
@@ -713,20 +607,13 @@
             });
             suggBox.style.display = 'block';
           } else {
-            suggBox.innerHTML = '<div class="suggestion-item" style="color:#ff0055;">No se encontró. Tocá el punto exacto en el mapa.</div>';
-            suggBox.style.display = 'block';
+            suggBox.style.display = 'none';
           }
-        } catch (e) {
-          suggBox.style.display = 'none';
-        }
-      }, 400);
+        } catch (e) { suggBox.style.display = 'none'; }
+      }, 300);
     }
 
-    function clearOrigin() {
-      startLiveGPS();
-      showToast('🔄 Ubicación GPS restablecida y bloqueada', true);
-    }
-
+    function clearOrigin() { startLiveGPS(); }
     function clearDestination() {
       destPos = null;
       document.getElementById('destInput').value = '';
@@ -734,7 +621,6 @@
       clearRoutes();
       saveState();
     }
-
     function clearRoutes() {
       if (routeLayerGroup) map.removeLayer(routeLayerGroup);
       if (detourLayerGroup) map.removeLayer(detourLayerGroup);
@@ -757,27 +643,19 @@
 
     function reportIncident(type, label) {
       closeAllMenus();
-      // Se fija automáticamente en la ubicación actual del usuario (GPS o posición por defecto)
       const targetPos = userPos ? userPos : DEFAULT_ORIGIN;
       createIncidentMarker(targetPos[0], targetPos[1], type, label, Date.now());
       saveState();
-      const alertName = currentTheme === 'pacman' && (type === 'bache' || type === 'manifestacion' || type === 'corte' || type === 'corte_parcial') ? 'Bache 💩' : label;
-      showToast(`Atención: Alerta de ${alertName} reportada en tu ubicación actual (puedes moverla si deseas)`, true);
       recalculateSmartRoute();
     }
 
     function createIncidentMarker(lat, lng, type, label, id) {
       const latlng = [lat, lng];
-      const markerContent = currentTheme === 'pacman' 
-        ? getGhostSvgHtml(type) 
-        : `<div class="draggable-marker">${incidentEmojis[type] || '⚠️'}</div>`;
+      const markerContent = currentTheme === 'pacman' ? getGhostSvgHtml(type) : `<div class="draggable-marker">${incidentEmojis[type] || '⚠️'}</div>`;
       
       const incidentMarker = L.marker(latlng, {
         draggable: true,
-        icon: L.divIcon({
-          html: markerContent,
-          iconSize: [38, 38], iconAnchor: [19, 19]
-        })
+        icon: L.divIcon({ html: markerContent, iconSize: [38, 38], iconAnchor: [19, 19] })
       }).addTo(map);
 
       const incidentObj = { id: id || Date.now(), type, label, pos: latlng, marker: incidentMarker };
@@ -785,18 +663,17 @@
 
       const popupContent = document.createElement('div');
       popupContent.style.textAlign = 'center';
-      popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div><div style="font-size:11px; color:#aaa; margin-top:2px;">(Arrastrable para ajustar)</div>`;
+      popupContent.innerHTML = `<div style="font-weight:bold;">${label}</div>`;
       
       const deleteBtn = document.createElement('button');
-      deleteBtn.style.cssText = 'background:#ff0055; color:#fff; border:none; padding:8px 12px; border-radius:8px; width:100%; margin-top:6px; cursor:pointer; font-weight:800;';
-      deleteBtn.innerHTML = '❌ ELIMINAR';
+      deleteBtn.style.cssText = 'background:#ff0055; color:#fff; border:none; padding:6px 10px; border-radius:6px; width:100%; margin-top:6px; cursor:pointer; font-weight:800;';
+      deleteBtn.innerHTML = 'ELIMINAR';
       deleteBtn.onclick = () => { 
         map.removeLayer(incidentMarker); 
         activeIncidents = activeIncidents.filter(i => i.id !== incidentObj.id);
         saveState();
         recalculateSmartRoute();
       };
-      
       popupContent.appendChild(deleteBtn);
       incidentMarker.bindPopup(popupContent);
 
@@ -831,28 +708,20 @@
 
     function calculateRoute() {
       document.getElementById('suggestions').style.display = 'none';
-      if (!userPos || !destPos) {
-        showToast('Por favor, asegurá tu destino en el mapa', true);
-        return;
-      }
+      if (!userPos || !destPos) { showToast('Falta definir destino', true); return; }
       recalculateSmartRoute();
     }
 
     const SAFETY_BUFFER_METERS = 100;
-
-    // Modificación: Solo se consideran bloqueantes u obligatorias de desvío las alertas graves (controles, radares, cortes totales, etc.), excluyendo baches y cortes de media calzada.
     function isIncidentBlocking(type) {
-      if (type === 'bache' || type === 'corte_parcial') {
-        return false;
-      }
-      return true;
+      return !(type === 'bache' || type === 'corte_parcial');
     }
 
     function isRouteSafe(coords) {
       if (activeIncidents.length === 0) return true;
       return coords.every(coord => {
         return activeIncidents.every(incident => {
-          if (!isIncidentBlocking(incident.type)) return true; // Si es bache o media calzada, no bloquea el paso de la ruta
+          if (!isIncidentBlocking(incident.type)) return true;
           return getDistanceMeters(coord, incident.pos) > SAFETY_BUFFER_METERS;
         });
       });
@@ -860,7 +729,6 @@
 
     async function recalculateSmartRoute() {
       if (!userPos || !destPos) return;
-
       const directRoutes = await fetchOSRM([userPos, destPos]);
       if (directRoutes.length === 0) return;
 
@@ -875,94 +743,13 @@
         availableDetours = [];
         return;
       }
-
-      let validCandidates = [];
-
-      for (let r of directRoutes) {
-        if (isRouteSafe(r.coords)) {
-          validCandidates.push(r);
-        }
-      }
-
-      if (validCandidates.length === 0) {
-        validCandidates = await findBypassRoutes([0.002, -0.002, 0.004, -0.004]);
-      }
-
-      if (validCandidates.length === 0) {
-        validCandidates = await findBypassRoutes([0.008, -0.008, 0.012, -0.012, 0.016, -0.016]);
-      }
-
-      if (validCandidates.length > 0) {
-        validCandidates.sort((a, b) => a.distance - b.distance);
-        availableDetours = validCandidates;
-        currentDetourIndex = 0;
-
-        renderCurrentDetour();
-        document.getElementById('btnDetour').style.display = 'block';
-        document.getElementById('btnNextDetour').style.display = availableDetours.length > 1 ? 'block' : 'none';
-
-        showToast(`Atención: ${availableDetours.length} atajo(s) despejado(s) hallados`, true);
-      } else {
-        if (detourLayerGroup) map.removeLayer(detourLayerGroup);
-        document.getElementById('btnDetour').style.display = 'none';
-        document.getElementById('btnNextDetour').style.display = 'none';
-        availableDetours = [];
-        showToast('Precaución: No hay rutas completamente despejadas', true);
-      }
-    }
-
-    async function findBypassRoutes(offsets) {
-      let promises = [];
-      for (let incident of activeIncidents) {
-        if (!isIncidentBlocking(incident.type)) continue;
-        const cLat = incident.pos[0];
-        const cLng = incident.pos[1];
-        for (let latOff of offsets) {
-          for (let lngOff of offsets) {
-            const bypass = [cLat + latOff, cLng + lngOff];
-            if (activeIncidents.every(inc => !isIncidentBlocking(inc.type) || getDistanceMeters(bypass, inc.pos) > SAFETY_BUFFER_METERS)) {
-              promises.push(fetchOSRM([userPos, bypass, destPos]));
-            }
-          }
-        }
-      }
-
-      const resultsArray = await Promise.all(promises);
-      let candidates = [];
-
-      resultsArray.forEach(routes => {
-        routes.forEach(tRoute => {
-          if (isRouteSafe(tRoute.coords)) {
-            if (!candidates.some(r => Math.abs(r.distance - tRoute.distance) < 40)) {
-              candidates.push(tRoute);
-            }
-          }
-        });
-      });
-
-      return candidates;
-    }
-
-    function renderCurrentDetour() {
-      if (availableDetours.length === 0) return;
-      detourRoute = availableDetours[currentDetourIndex];
-      drawRoute(detourRoute.coords, true);
-    }
-
-    function cycleNextDetour() {
-      if (availableDetours.length <= 1) return;
-      currentDetourIndex = (currentDetourIndex + 1) % availableDetours.length;
-      renderCurrentDetour();
-      showToast(`Atajo alternativo ${currentDetourIndex + 1}`, true);
     }
 
     function getDistanceMeters(p1, p2) {
       const R = 6371000;
       const dLat = (p2[0] - p1[0]) * Math.PI / 180;
       const dLon = (p2[1] - p1[1]) * Math.PI / 180;
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(p1[0] * Math.PI / 180) * Math.cos(p2[0] * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(p1[0]*Math.PI/180) * Math.cos(p2[0]*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
@@ -971,68 +758,28 @@
       if (!isDetour && routeLayerGroup) map.removeLayer(routeLayerGroup);
 
       const group = L.layerGroup();
-      
       let mainColor = isDetour ? '#ff007f' : '#ffb800';
-      let dashOption = null;
-
-      if (currentTheme === 'pacman') {
-        mainColor = isDetour ? '#ff007f' : '#ffb800';
-        dashOption = '3, 16';
-      }
-
-      const glowLine = L.polyline(coords, { 
-        color: mainColor, 
-        weight: isDetour ? 10 : 12, 
-        opacity: 0.4, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        dashArray: dashOption 
-      });
       
-      const coreLine = L.polyline(coords, { 
-        color: currentTheme === 'pacman' ? '#ffb800' : '#ffffff', 
-        weight: isDetour ? 4 : 5, 
-        opacity: 1, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        dashArray: dashOption 
-      });
+      const glowLine = L.polyline(coords, { color: mainColor, weight: 10, opacity: 0.4, lineCap: 'round', lineJoin: 'round' });
+      const coreLine = L.polyline(coords, { color: '#ffffff', weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round' });
 
-      group.addLayer(glowLine); 
-      group.addLayer(coreLine); 
-      group.addTo(map);
-
-      if (isDetour) detourLayerGroup = group;
-      else routeLayerGroup = group;
+      group.addLayer(glowLine); group.addLayer(coreLine); group.addTo(map);
+      if (isDetour) detourLayerGroup = group; else routeLayerGroup = group;
     }
 
     function updateNavInfo(routeData) {
       document.getElementById('navPanel').style.display = 'flex';
       document.getElementById('btnStart').style.display = 'block';
-      const distKm = (routeData.distance / 1000).toFixed(1);
-      document.getElementById('navDistance').textContent = `${distKm} km`;
+      document.getElementById('navDistance').textContent = `${(routeData.distance / 1000).toFixed(1)} km`;
       document.getElementById('navStreet').textContent = 'RUTA CALCULADA';
-    }
-
-    function activateDetour() {
-      if (!detourRoute) return;
-      drawRoute(detourRoute.coords, false);
-      if (detourLayerGroup) map.removeLayer(detourLayerGroup);
-      currentRoute = detourRoute;
-      document.getElementById('btnDetour').style.display = 'none';
-      document.getElementById('btnNextDetour').style.display = 'none';
-      showToast('Navegando por el atajo', true);
     }
 
     function startNavigation() {
       isNavigating = true;
       document.getElementById('btnStart').style.display = 'none';
-      document.getElementById('btnDetour').style.display = 'none';
-      document.getElementById('btnNextDetour').style.display = 'none';
       document.getElementById('btnStop').style.display = 'block';
       document.getElementById('navStreet').textContent = 'NAVEGANDO...';
-      document.getElementById('navDetail').textContent = 'Seguimiento de GPS en vivo activo';
-      showToast('Viaje iniciado. GPS en tiempo real activado', true);
+      showToast('Viaje iniciado', true);
     }
 
     function stopNavigation() {
@@ -1040,12 +787,30 @@
       document.getElementById('btnStop').style.display = 'none';
       document.getElementById('btnStart').style.display = 'block';
       document.getElementById('navStreet').textContent = 'SISTEMA LISTO';
-      document.getElementById('navDetail').textContent = 'Tocá "Iniciar viaje" para comenzar';
-      showToast('Viaje finalizado', true);
+    }
+
+    // NUEVA FUNCIÓN PARA ABRIR UBER DIRECTAMENTE CON LAS COORDENADAS DE DESTINO
+    function openUberWithDestination() {
+      if (!destPos) {
+        showToast('Primero seleccioná un destino en el mapa', true);
+        return;
+      }
+      const lat = destPos[0];
+      const lng = destPos[1];
+      const destName = encodeURIComponent(document.getElementById('destInput').value || 'Destino HUD');
+
+      // Enlace universal deeplink oficial de Uber con coordenadas y nombre
+      const uberUrl = `https://m.uber.com/ul/?action=setPickup&dropoff[latitude]=${lat}&dropoff[longitude]=${lng}&dropoff[nickname]=${destName}`;
+      
+      window.open(uberUrl, '_blank');
+      showToast('Abriendo Uber con el destino cargado...', true);
     }
 
     function showToast(msg, speakIt = false) {
-      if (speakIt) speak(msg);
+      if (speakIt && isVoiceActive && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(msg));
+      }
     }
   </script>
 </body>
